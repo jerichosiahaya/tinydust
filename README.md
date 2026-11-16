@@ -2,19 +2,28 @@
 
 **A little room to focus.** A cozy, 8-bit-inspired [Herdr](https://herdr.dev) layout: agents in the garden, one next step, and somewhere to park a thought.
 
-![TinyDust in Herdr: an original pixel farm and agent sidebar on the left, a welcome panel in the center, and a field journal with one Now task, a task list, and notes on the right.](preview.png)
+![TinyDust in Herdr: a rose-roofed pixel farm and colorful characters on the left, a sample welcome panel in the center, and a simple Now-and-notes journal on the right.](preview.png)
 
 *Captured in Herdr, with explicitly labeled sample agents, tasks, and workspace. The center welcome panel is screenshot-only; the installed layout shows your real terminals there. No personal notes, conversations, or project names are included.*
 
 ## A small, useful place
 
 - **Original pixel farm.** A tiled roof, vegetable beds, orchard, pond, and a sleeping cat. Stepped highlights, contact shadows, and diagonal cast shadows add depth without blurring the pixels. No ripped game assets.
-- **Live farmhands.** One farmer per status-reporting agent in the current space. Click to focus its agent. Working, needs-you, done, and idle are written out—not just color-coded.
-- **Field journal.** A multiline scratchpad saved locally as you type. The journal stays with this layout across spaces; it isn't a separate note per project.
-- **Now, next, later.** Choose exactly one task for **Now**. Add small steps with Enter, mark them done, reopen completed tasks, or undo the last completion. Completed tasks stay hidden until you ask for them.
+- **Eight little characters.** A cat, rabbit, fox, bear, frog, duck, farmer, and gardener. Each agent gets a stable character based on its terminal address—not its position in the list. Click the portrait to focus that agent. Working, needs-you, done, and idle are written out, not just color-coded.
+- **A softer palette.** Dusty rose, lilac, sage, apricot, and denim blue, grounded by warm charcoal. Colorful and a little sweet without turning everything pink.
+- **A simpler journal.** Just **Now** and **Notes** up front. Notes save locally as you type. Expand **Tasks** when you need the list; it starts folded away. The same journal follows you across spaces.
+- **Small tasks, fewer buttons.** Expand Tasks, type a step and press Enter or Add. Use **Focus** to make it your one Now task, or the circle to complete it. Completed tasks can be reopened; the last completion can be undone.
 - **Quiet view.** Hides the landscape and next-step/completed lists, while keeping your current task, notes, and agent statuses accessible. “Show more” brings everything back.
 - **Motion off by default.** Optional native farmer animation; Quiet view suppresses it too. No animation timers, confetti, or flashing alerts added by TinyDust.
 - **Your normal workspace.** Herdr's tabs, pane controls, files, changes, spaces, and status bar remain available. The **Journal** button hides or shows the right sidebar.
+
+### Meet the crew
+
+![Eight original pixel characters: Miso, Clover, Maple, Cocoa, Fern, Sunny, Rowan, and Sage.](mods/tinydust/characters.svg)
+
+**Miso** the cat · **Clover** the rabbit · **Maple** the fox · **Cocoa** the bear · **Fern** the frog · **Sunny** the duck · **Rowan** the farmer · **Sage** the gardener.
+
+Character names appear in portrait tooltips. They're visual companions, not extra agents. Different terminals may share a character; the cast does not impose an agent limit.
 
 ### ADHD-conscious, not a medical claim
 
@@ -55,10 +64,11 @@ The installer backs up replaced code under `~/.config/herdr-app/backups/tinydust
 | Action | How |
 | --- | --- |
 | Focus an agent | Click its farmer |
-| Add a task | Type a small step, then Enter or Add step |
-| Pick the current task | Do now |
+| Open the task list | Tasks, below Notes |
+| Add a task | Type a small step, then Enter or Add |
+| Pick the current task | Focus |
 | Put it back in the list | Later |
-| Complete / restore | Mark done, Undo last completion, or Reopen |
+| Complete / restore | Done on the Now card; circle/checkmark on a task row; Undo last completion |
 | Reduce visual load | Quiet view; Show more to return |
 | Toggle notes sidebar | Journal, in the top-left brand bar |
 | Animate working farmers | Motion on; off initially |
@@ -90,6 +100,7 @@ No npm dependencies or build step are needed to run the layout. Node.js 22+ is u
 ```sh
 npm test
 python3 scripts/draw-art.py
+python3 scripts/draw-characters.py
 python3 scripts/install.py --update
 herdr-app check ~/.config/herdr-app/mods/tinydust
 herdr-app check ~/.config/herdr-app/mods/tinydust-journal
@@ -98,10 +109,11 @@ herdr-app check ~/.config/herdr-app/mods/tinydust-journal
 | Path | Purpose |
 | --- | --- |
 | `layouts/tinydust.json` | Window arrangement and mod slots |
-| `themes/tinydust.json` | Earthy terminal and panel colors |
+| `themes/tinydust.json` | Rose, lilac, and sage terminal/panel colors |
 | `mods/tinydust/` | Brand bar, farm art, live agents |
 | `mods/tinydust-journal/` | Notes, tasks, Quiet view, storage |
-| `scripts/draw-art.py` | Deterministic, dependency-free SVG art source |
+| `scripts/draw-art.py` | Deterministic, dependency-free farm SVG source |
+| `scripts/draw-characters.py` | Eight original sprites and the character lineup |
 | `scripts/screenshot.py` | Temporary sample-data preview; restores the previous layout |
 | `tests/` | State/render tests and screenshot-only welcome panel |
 | `RECIPE.md` | Brief for rebuilding or remixing the layout |
@@ -116,7 +128,7 @@ The script temporarily switches layouts, substitutes sample data and a welcome p
 
 ### Validation
 
-Five automated test cases cover storage validation, missing keys, Now-task behavior, completion/reopening/undo, preservation of newly added tasks, notes round-tripping, save failures, demo isolation, agent filtering/focusing, compact rendering, and motion/Quiet view. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; normal and sample-data layouts were visually inspected on Linux. Full keyboard/screen-reader and cross-platform testing remains outstanding.
+Five automated test cases cover storage validation, missing keys, Now-task behavior, completion/reopening/undo, preservation of newly added tasks, notes round-tripping, save failures, demo isolation, agent filtering/focusing, stable character assignment and assets, collapsed task controls, compact rendering, and motion/Quiet view. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; normal and sample-data layouts were visually inspected on Linux. Full keyboard/screen-reader and cross-platform testing remains outstanding.
 
 ## Credits and license
 

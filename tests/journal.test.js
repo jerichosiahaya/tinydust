@@ -64,6 +64,8 @@ function harness({raw=null,demo=false,broken=false}={}) {
 test('notes/tasks survive reload; undo completion keeps subsequently added tasks',()=>{
   const h=harness(),j=h.journal;
   j.notes.edit('Remember the next step.\nUnicode: 🌱',h.cx);
+  assert(!flatten(j.render()).some(n=>n.attrs?.id?.[0]==='add-task'), 'Task controls start collapsed');
+  h.click('show-tasks');
   j.input.set_value('First');h.click('add-task');
   const id=j.data.tasks[0].id;h.click(`now-${id}`);h.click('current-done');
   j.input.set_value('Second');j.input.events.submit({},h.cx);
@@ -72,16 +74,19 @@ test('notes/tasks survive reload; undo completion keeps subsequently added tasks
   assert.equal(reloaded.journal.notes.value(),j.notes.value());
   assert.equal(reloaded.journal.data.tasks.length,2);
   const nowCard=flatten(j.render()).find(n=>typeof n!=='string'&&n.attrs.id?.[0]==='now-card');
-  assert(!flatten(nowCard).includes('Scratchpad'), 'Now card must not enclose the journal');
+  assert(!flatten(nowCard).includes('Notes'), 'Now card must not enclose the journal');
   h.click('quiet');assert.equal(h.shared.get('tinydust.quiet'),true);
   assert(!flatten(j.render()).some(n=>typeof n!=='string'&&n.attrs.id?.[0]==='add-task'));
 });
 test('corruption is not overwritten, storage errors retain input, demo never writes',()=>{
   const corrupt=harness({raw:'broken'});assert(corrupt.journal.locked);assert.equal(corrupt.writes(),0);
   assert(corrupt.journal.render());
-  const fail=harness({broken:true});fail.journal.input.set_value('Keep me');fail.click('add-task');
+  const fail=harness({broken:true});fail.click('show-tasks');fail.journal.input.set_value('Keep me');fail.click('add-task');
   assert.equal(fail.journal.input.value(),'Keep me');assert.equal(fail.journal.data.tasks.length,0);assert(!fail.journal.saved);
   fail.journal.notes.edit('Unsaved draft',fail.cx);fail.failWrites(false);fail.click('add-task');
   assert.equal(JSON.parse(fail.storage()).notes,'Unsaved draft');
   const demo=harness({demo:true});demo.journal.notes.edit('Sample only',demo.cx);assert.equal(demo.writes(),0);
+  demo.shared.set('tinydust.quiet',true);
+  assert(flatten(demo.journal.render()).some(n=>n.attrs?.id?.[0]==='show-tasks'), 'Sample ignores personal Quiet view');
+  demo.click('quiet');assert.equal(demo.shared.get('tinydust.quiet'),true);
 });

@@ -5,10 +5,20 @@ import random
 ROOT = Path(__file__).resolve().parents[1]
 random.seed(7)
 parts = []
+# Rose and lilac accents balanced by sage, denim blue, and warm wood.
+TONES = {
+    '#adc7a0':'#d7c4cf', '#88a780':'#b1b8b7', '#779875':'#9caea4', '#73926d':'#96a79f',
+    '#d3dcc0':'#f0dedc', '#7f9b59':'#8eaa83', '#8da663':'#a3b991', '#718b4e':'#7a9572', '#a3ad67':'#bac392',
+    '#c58453':'#b8818e', '#8f523c':'#8b606f', '#dd9e68':'#d8a3b0', '#593e31':'#634b56',
+    '#576944':'#65735e', '#596d42':'#65755e', '#3e6241':'#4d715b', '#517a47':'#63866a',
+    '#628951':'#779978', '#6f954f':'#86a780', '#88a95e':'#a3bd90', '#446e41':'#587b60',
+    '#c18751':'#d09a9b', '#e2ac65':'#efc1b9', '#658d87':'#829daa', '#557775':'#607f91',
+    '#8fae9a':'#a6bfca', '#bad0b0':'#d8e2dc', '#a8c0a4':'#bdcfdb',
+}
 def r(x, y, w, h, c):
-    parts.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{c}"/>')
+    parts.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{TONES.get(c,c)}"/>')
 def p(points, color):
-    parts.append(f'<polygon points="{points}" fill="{color}"/>')
+    parts.append(f'<polygon points="{points}" fill="{TONES.get(color,color)}"/>')
 
 r(0, 0, 160, 112, '#adc7a0')
 r(0, 24, 160, 16, '#88a780')
@@ -61,8 +71,9 @@ for y in [83,98]:
 for x in [67,79,91]:
     r(x+2,62,3,15,'#647347');r(x,58,3,15,'#b79761');r(x,58,2,13,'#dfc28a')
 r(67,62,27,2,'#d0ae73');r(67,68,27,2,'#a88a53')
-for x,y in [(7,58),(69,104),(101,64),(153,55),(58,100)]:
-    r(x,y,1,4,'#53783e');r(x-1,y-1,3,2,'#e9c778');r(x,y-2,1,1,'#f6dfaa')
+for i,(x,y) in enumerate([(7,58),(69,104),(101,64),(153,55),(58,100),(96,77),(78,92),(18,94),(145,65)]):
+    petal=['#dca9bb','#c0add6','#f1d49d'][i%3]
+    r(x,y,1,4,'#53783e');r(x-1,y-1,3,2,petal);r(x,y-2,1,1,'#fae9d3')
 r(62,73,10,3,'#586743');r(63,70,7,4,'#c6a06b');r(62,69,3,3,'#d5b580');r(62,68,1,2,'#8f6b45');r(64,71,1,1,'#5c4934')
 svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="448" viewBox="0 0 160 112" shape-rendering="crispEdges">' + ''.join(parts) + '</svg>\n'
 (ROOT/'mods/tinydust/farm.svg').write_text(svg)

@@ -20,8 +20,8 @@ export default class Preview extends View {
       .child(image('mods/tinydust/farm.svg').w(480).h(336).flex_none())
       .child(div().text_size(17).font_semibold().child('Start small. Leave room for later.'))
       .child(div().text_size(14).text_color(t.muted).child('01   Choose one task for Now.'))
-      .child(div().text_size(14).text_color(t.muted).child('02   Park stray thoughts in your scratchpad.'))
-      .child(div().text_size(14).text_color(t.muted).child('03   Use Quiet view when you want less on screen.'))
+      .child(div().text_size(14).text_color(t.muted).child('02   Park stray thoughts in Notes.'))
+      .child(div().text_size(14).text_color(t.muted).child('03   Open Tasks only when you need them.'))
       .child(div().flex_1())
       .child(div().text_size(11).text_color(t.muted).child('Screenshot-only welcome panel. Your normal layout shows live terminals here.'));
   }

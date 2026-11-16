@@ -23,7 +23,7 @@ test('live garden filters spaces, focuses the right agent, and respects quiet/mo
     props:()=>properties,theme:()=>new Proxy({},{get:()=> '#aabbcc'}),shared:k=>preferences.get(k),setShared:(k,v)=>preferences.set(k,v),
     agents:()=>data,spaces:()=>[{id:'here',active:true}],setAgentOrder:v=>order=v,run:(...args)=>calls.push(args)};
   vm.createContext(context);
-  const source=readFileSync(new URL('../mods/tinydust/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace('export function farmer','function farmer').replace('export default class TinyDust','class TinyDust')+'\nthis.Garden=TinyDust;';
+  const source=readFileSync(new URL('../mods/tinydust/main.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export function /g,'function ').replace('export default class TinyDust','class TinyDust')+'\nthis.Garden=TinyDust;';
   vm.runInContext(source,context);
   const garden=new context.Garden();garden.init();
   let nodes=flat(garden.render());
@@ -35,8 +35,16 @@ test('live garden filters spaces, focuses the right agent, and respects quiet/mo
   assert(!nodes.some(n=>n.attrs?.loop));
   preferences.set('tinydust.motion',true);assert(flat(garden.render()).some(n=>n.attrs?.loop));
   preferences.set('tinydust.quiet',true);nodes=flat(garden.render());
-  assert(!nodes.some(n=>n.attrs?.loop||n.attrs?.image));
+  assert(!nodes.some(n=>n.attrs?.loop||n.attrs?.image?.[0]==='mods/tinydust/farm.svg'));
+  assert(nodes.some(n=>n.attrs?.image?.[0]?.endsWith('.svg')), 'Quiet view retains character portraits');
+  const before=context.characterFor('a1');
+  data.reverse();garden.render();assert.equal(context.characterFor('a1'),before);
+  const kinds=new Set(Array.from({length:64},(_,i)=>context.characterFor(`agent-${i}`)[0]));
+  assert.equal(kinds.size,8);
+  for(const kind of kinds)assert(readFileSync(new URL(`../mods/tinydust/${kind}.svg`,import.meta.url),'utf8').includes('<svg'));
   garden.width=100;nodes=flat(garden.render());assert(!nodes.includes('Farmhands'));
-  properties={demo:true};calls=[];nodes=flat(garden.render());
+  properties={demo:true};calls=[];garden.width=300;nodes=flat(garden.render());
+  assert(nodes.some(n=>n.attrs?.image?.[0]==='mods/tinydust/farm.svg'), 'Sample preview ignores personal Quiet view');
+  assert(!nodes.some(n=>n.attrs?.loop), 'Sample preview starts still');
   nodes.find(n=>n.attrs?.id?.[0]==='farmer-sample-1').attrs.on_click[0]();assert.equal(calls.length,0);
 });
