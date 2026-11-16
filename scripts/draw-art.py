@@ -55,6 +55,7 @@ p('107,80 114,75 135,75 146,81 150,92 145,98 119,98 108,93', '#586843')
 p('109,80 117,77 134,77 144,82 147,91 142,95 119,95 111,91', '#658d87')
 r(115,82,12,1,'#a8c0a4');r(125,88,16,1,'#8fae9a');r(117,91,6,1,'#bad0b0');r(140,85,4,2,'#557775')
 # Orchard. Layered stepped canopy and diagonal shadow.
+tree_start=len(parts)
 for x,y in [(91,35),(133,32),(8,83)]:
     p(f'{x-4},{y+17} {x+12},{y+13} {x+24},{y+26} {x+20},{y+31} {x+2},{y+28}', '#596d42')
     r(x+2,y+7,5,18,'#634e32');r(x+2,y+9,2,14,'#9b7748')
@@ -62,6 +63,7 @@ for x,y in [(91,35),(133,32),(8,83)]:
         r(x+dx,y+dy,w,h,c)
     for dx,dy in [(-4,-1),(8,0),(1,7)]:
         r(x+dx,y+dy,3,3,'#c18751'); r(x+dx,y+dy,2,1,'#e2ac65')
+tree_end=len(parts)
 # Vegetable beds with contact shadows and highlights.
 for y in [83,98]:
     r(24,y,28,9,'#59462e');r(24,y,27,7,'#8c6440')
@@ -78,4 +80,7 @@ r(62,73,10,3,'#586743');r(63,70,7,4,'#c6a06b');r(62,69,3,3,'#d5b580');r(62,68,1,
 svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="448" viewBox="0 0 160 112" shape-rendering="crispEdges">' + ''.join(parts) + '</svg>\n'
 (ROOT/'mods/tinydust/farm.svg').write_text(svg)
 (ROOT/'layouts/tinydust.svg').write_text(svg)
-print('Rendered farm.svg and layout preview')
+ground='<svg xmlns="http://www.w3.org/2000/svg" width="640" height="448" viewBox="0 0 160 112" shape-rendering="crispEdges">'+''.join(parts[:tree_start]+parts[tree_end:])+'</svg>\n'
+(ROOT/'mods/tinydust/farm-ground.svg').write_text(ground)
+(ROOT/'mods/tinydust/tree.svg').write_text('''<svg xmlns="http://www.w3.org/2000/svg" width="96" height="120" viewBox="0 0 24 30" shape-rendering="crispEdges"><polygon points="6,23 17,21 24,27 24,30 12,28" fill="#46523d55"/><rect x="10" y="14" width="5" height="13" fill="#775745"/><rect x="10" y="15" width="2" height="10" fill="#b09068"/><rect x="3" y="9" width="19" height="10" fill="#50745c"/><rect x="5" y="4" width="15" height="13" fill="#6f9571"/><rect x="8" y="1" width="9" height="8" fill="#8eb28c"/><rect x="4" y="9" width="12" height="5" fill="#a5c19a"/><rect x="15" y="12" width="7" height="6" fill="#587d60"/><rect x="8" y="10" width="3" height="3" fill="#e4a7b6"/><rect x="16" y="8" width="3" height="3" fill="#ecc5bb"/><rect x="12" y="16" width="3" height="3" fill="#d497aa"/></svg>\n''')
+print('Rendered farm, tree-free ground, tree sprite, and layout preview')

@@ -1,51 +1,57 @@
 # TinyDust
 
-A quiet farming-inspired Herdr window. A rose-roofed farmhouse and orchard sit above colorful animal and human agent characters on the left, real terminals fill the middle, and a simple journal keeps one current task and notes on the right.
+An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and animal/human agent characters. Working agents water crops, idle ones sit on picnic blankets, blocked ones ask for help, and finished ones cheer. A simple journal keeps Now and Notes visible while Tasks stays folded away.
 
-![TinyDust, captured in Herdr with sample data](preview.png)
+![TinyDust, captured in Herdr with an expanded sample farm](preview.png)
 
 ## What you see
 
-- A 300px left sidebar (resizable 44–480), a 46px TinyDust brand row with a Journal toggle, Herdr's Spaces block initially 150px tall, then the farm and agent list. Herdr's settings/machine footer stays at the bottom.
-- Original 160×112 logical-pixel farm illustration, scaled as a crisp SVG to the panel width. Warm daylight from the upper left creates stepped highlights, darker right faces, contact shadows, and offset cast shadows. House, orchard, tilled beds, path, pond, cat. No borrowed game assets.
-- 80px agent rows with one of eight shaded pixel characters: cat, rabbit, fox, bear, frog, duck, farmer, gardener. Muted lilac, rose, sage, honey, and teal portrait backgrounds. Readable agent name, explicit status, tab name, and address. Narrow rails show status symbols. Small or Quiet panels omit the landscape.
-- Center: Herdr's 42px tab bar, active tab's normal terminal splits with 30px pane headers and 6px corner radius, optional Files/Changes panels, and a 28px status bar.
-- Right: a 320px Journal (resizable 280–460). Only the Now card has an accent outline. Below: 240px multiline Notes with a local-save label, then a Tasks disclosure (closed initially). No repeated instructions or decorative counters. Expanded Tasks has a one-row input and Add button, compact checkbox/text/Focus rows, and a completed-list disclosure.
-- Palette: terminal `#28262b`, text `#f2e7e2`, chrome `#302c33`, rose accent `#e8b4c4`. Sage, lilac, apricot, and blue supply secondary colors; warm charcoal keeps it grounded. Keep the user's terminal/UI fonts.
+- A 300px left sidebar, resizable 44–480. A 46px TinyDust brand row with Journal toggle, Herdr's Spaces initially 150px tall, then Your little corner. Herdr's settings/machine footer stays below.
+- The corner has Motion and Visit farm controls and an exact `N working · N trees` counter. A tree-free farmhouse illustration forms the backdrop; active agents grow the visible grove. Beneath it, three lanes per row contain actual clickable characters and short nameplates, crop plots, help signs, delivery patches, and picnic blankets.
+- Up to six characters per page, or three in shorter sidebar panels. Previous/Next reaches everyone. A focused agent gets a pale ground marker; a newly focused off-page agent brings its page into view. A compact, scrollable agent list remains below. Small or Quiet sidebars omit the scene but keep this list.
+- Visit farm opens a 940×720 native dialog with the same live farm, larger sprites, Back to work, and Alert settings. The world is at most 960px wide and scrolls vertically if needed. Escape closes it. No terminal sessions or workspaces are created or closed.
+- Eight characters: Miso/cat, Clover/rabbit, Maple/fox, Cocoa/bear, Fern/frog, Sunny/duck, Rowan/farmer, Sage/gardener. Muted lilac, rose, sage, honey, and teal. They are artwork for existing agents, not additional running agents.
+- Center: Herdr's normal tab bar, active terminal splits, pane controls, Files/Changes panels and status bar. Right: 320px Journal, resizable 280–460, with Now, 240px multiline Notes, and collapsed Tasks.
+- Terminal `#28262b`, text `#f2e7e2`, chrome `#302c33`, accent `#e8b4c4`. Respect the user's fonts. Keep text readable; no flashing warnings or reward counters.
 
 ## How it behaves
 
-- Read only agents in the active space. Preserve their Herdr order; include other spaces after them in keyboard agent navigation. Clicking a character uses `agent.focus` with that exact terminal address. Assign character with an unsigned 31-based hash of the address modulo eight, so reordering never swaps characters. Repeats are allowed. Tooltip includes character name.
-- Working: watering-can farmer, optional 2px vertical motion. Blocked: an exclamation mark and “Needs you.” Done: a harvest basket and “Done.” Idle: still, labeled resting. Unknown remains explicit.
-- Motion is off initially. Native `.loop()` only, no timer redraw loop. Quiet view also suppresses animation.
-- Expand Tasks, then add a task with Enter or Add. Use Focus on a task row to choose Now, and its circle/checkmark to complete/reopen. Task rows start hidden but never lose their data. Empty and >240-character titles produce an inline message. At most 500 retained tasks. One task may be Now. Completing it empties Now rather than promoting another task. Reopen completed tasks. Undo only the last completion/reopening and don't lose subsequent tasks or notes.
-- Notes save on change. Data is one device-local journal for this layout across spaces, not per project. Validate storage; a missing key is a fresh journal, a malformed value is an error and must never be overwritten automatically. A save error must not erase draft input or pretend it saved.
-- Quiet view hides scenery, next-step list, and completed list; retains Now, notes, and agent statuses. Show more restores them. Do not add deadlines, streaks, nagging sounds, or rewards.
-- Journal button toggles the right panel. Keep normal Herdr terminals and controls working.
+- Read only agents in the active space. Preserve model order; include other spaces after the visible list in keyboard agent navigation. Hash the terminal address with unsigned 31-based hashing modulo eight for a stable character. Reordering must not swap species; repeats are allowed.
+- **Working:** two original watering frames, tilled soil, growing shoots, falling water droplets with motion on. **Idle:** seated/rest pose on a picnic blanket, `z z z`. **Blocked:** help sign and static `Help!` bubble. **Done:** raised arms, gentle cheering motion, `Finished!` bubble. Unknown remains explicit in the list.
+- Click a scene character, its nameplate, or its list row: `agent.focus` with its exact terminal address. From Visit farm, close that dialog and focus the agent. Sample characters only change local preview selection.
+- One tree for each currently working agent in this space. It is an instantaneous activity display, not a lifetime achievement; the grove shrinks when agents finish/rest/leave. Draw at most 24 trees and disclose the exact total/visible count above that limit. Clicking a tree identifies its worker and gives a one-second shake with motion on. No points, currencies, or clicks that send work to an agent.
+- Work and cheer animation are native `.loop()` operations; position changes use native transitions. No frame polling or state polling. One cancellable one-shot timer clears a tree shake after a click. Motion is off initially and respects the existing `tinydust.motion` preference. Quiet suppresses it. Resume game explicitly leaves Quiet view and enables motion.
+- Herdr emits completion alerts itself: configured sound, and an in-app toast unless the user is looking at that agent. The layout names TinyDust as its toast renderer, preserving the original title/body/action while showing the character. Do not post a second notification or play a second sound. In Herdr 0.1.16 completion uses level `info`, title `<name> finished`, action `agent.focus` with `args.terminal`; it is not `success`.
+- Herdr turns `done` into `idle` when the agent is seen. Clear the cheer then. Do not assume every `working → idle`, disappearance, restart or reload means success. No external desktop-notification helper or push service is installed.
+- Journal: preserve `journal-v1` exactly. Expand Tasks to add with Enter/Add; empty or >240-character titles show an inline error, and at most 500 tasks are retained. Focus chooses one Now task. Circle/checkmark completes/reopens it; undo must preserve subsequently added tasks and notes. Completing Now does not auto-promote another task.
+- Notes save on change, device-locally in plaintext. Missing storage means a fresh journal; malformed storage must not be overwritten. Surface save failures and retain draft input. Quiet hides the task backlog, not Notes or Now. Journal focus commands focus Notes.
 
 ## Built from
 
-- `layouts/tinydust.json`: root row → sidebar + work column; work body row → active tab, hidden Files/Changes stack, journal.
-- `themes/tinydust.json`: ANSI palette and semantic chrome colors.
-- `mods/tinydust`: a View with optional `role: "brand"`; otherwise farm/agents. `agents`, `spaces`, `theme`, `shared`, `setShared`, `setAgentOrder`, `run`, `props`. Shared `tinydust.motion` and `tinydust.quiet` booleans.
-- `mods/tinydust-journal`: native InputState, TextareaState, Buttons; JSON validation and immutable task operations in `state.js`. Per-copy localStorage `journal-v1`, schema `{version:1, notes, tasks:[{id,text,done}], now}`. Journal focus command always focuses Notes. Preserve the existing `journal-v1` schema and key when redesigning the interface.
-- Shipped mods are referenced, not copied: `spaces`, `tabs`, `pane`, `files`, `changes`, `workspace-chrome`, `workspace-status`.
-- Mods have no network requests, subprocesses, agent plugins, or project file reads. Python installer copies only the source assets and runs native checks. Both art generators use only Python's standard library. `draw-characters.py` also generates a README lineup.
+- `layouts/tinydust.json`: root row → sidebar + work column; work body → active tab, hidden Files/Changes, journal. Root `toast: "tinydust"`.
+- `themes/tinydust.json`: ANSI and semantic panel colors.
+- `mods/tinydust/main.js`: brand/default garden/`role: "world"` dispatch, measured dimensions, page selection, tree interaction, overlay controls. Notification props (`overlay` plus `title`) dispatch to `toastView`.
+- `game.js`: pure status labels, stable character identity, pagination, working-grove count, bounded lane positions. `scene.js`: native drawing, original work/rest/cheer sprites, water, nameplates, tree clicks, optional motion. `toast.js`: notification presentation, dismissal, and original actions.
+- `mods/tinydust-journal`: native input, textarea and buttons; validation and immutable task operations in `state.js`. Per-copy localStorage schema `{version:1, notes, tasks:[{id,text,done}], now}`.
+- Shared settings: `tinydust.motion`, `tinydust.quiet`. No new user files, journal schema changes or keyboard bindings.
+- Shipped mods referenced, not bundled: spaces, tabs, pane, files, changes, workspace-chrome, workspace-status. Use Herdr live data, normal focus/layout/overlay commands and theme colors. Runtime mods perform no network calls, subprocesses, agent-plugin installs, terminal-output reads, or project-file reads.
+- `draw-art.py`: original postcard, tree-free live terrain, and tree sprite. `draw-characters.py`: eight original characters, two work frames, rest and cheer poses, plus README lineup. Both use only Python's standard library.
 
 ## Watch out
 
-- Herdr missing localStorage keys can be `undefined`, not just `null`.
-- `nextCommand()` resolves a string. A focusable mod must respond to `"focus"`.
-- GPUI is native, not HTML/CSS. Test against the installed generated types. `herdr-app check` does not exercise every live state.
-- Keep the Now card's child chain closed before rendering the rest of the journal; don't accidentally outline everything.
-- Herdr mod storage is plaintext and per copy. Never publish config `data/`, `shared.json`, keys, or real terminal screenshots. Sample screenshot props must never read/write the personal journal or focus a real agent.
-- The current version has no task edit/delete or journal export/sync. Quiet view does not disable Herdr's own notifications. Screen-reader and cross-platform behavior still need testing.
-- README screenshot uses explicit sample data and a screenshot-only welcome panel in place of terminals. Never imply these are real agent activity.
+- Herdr missing localStorage keys may be `undefined`, not only `null`. `nextCommand()` resolves a string.
+- Keep scene unit hit boxes narrow: full-scene overlapping wrappers can swallow another unit's clicks. Keep decorative layers noninteractive and provide native named Buttons for actions.
+- Bound scenes through pagination, not by silently dropping agents. Tree cap must be visible in the text, and all relevant agents must contribute to the counter, including off-page ones.
+- A snapshot's demo props must never focus a real agent, write the personal journal, or change real motion/Quiet preferences. Sample world state is separate.
+- The screenshot substitutes the expanded farm for terminal content and marks sample data explicitly. The regular center remains terminals; Visit farm is a dialog.
+- Never publish config data, shared state, real terminal screenshots, or personal notes. No game asset packs or World of Codecraft sources are included; its work/rest/marker/expanded-map patterns are design inspiration only.
+- GPUI is native, not HTML/CSS. Read installed generated types. `herdr-app check` alone does not cover all later states; check populated scene and toast fixtures too.
+- No task edit/delete/export UI, cloud sync, tool-specific animations, custom agent hooks, pathfinding, XP, combat, or OS push notifications in this version. Quiet does not silence Herdr's own sounds. Full keyboard/screen-reader and cross-platform behavior remain unverified.
 
 ## Done when
 
-1. Both mods pass `herdr-app check`; live layout has no errors and opens with an empty journal on first use.
-2. Node tests pass for persistence, corruption, undo, single Now task, save failures, demo isolation, garden filtering, focus targets, compact mode, and motion preferences.
-3. Real terminals remain usable; no existing layout, keyboard shortcut, or task is overwritten.
-4. Inspect a full native capture for clipping/contrast. Confirm the public screenshot contains only sample data and is labeled accordingly.
-5. Confirm normal mode and Quiet view offer a clear next action without moving, flashing, or automatically promoting tasks.
+1. Both mods pass `herdr-app check`, and `python3 scripts/check-native.py` passes populated animated/static scenes and completion/generic toast variants.
+2. Nine Node tests pass: journal persistence/undo/error handling plus tree counts/caps, pagination, focus targets, character stability, pose assets, tree feedback, Quiet/motion, demo isolation and native completion-payload handling.
+3. Inspect normal and sample-data layouts. Verify characters stay inside their lanes, trees stand on ground, names/bubbles remain readable and every agent is reachable.
+4. Confirm real terminals and the existing journal remain intact. Nothing sends input to an agent or starts another one.
+5. Confirm the public screenshot contains only labeled sample data. Document that completion delivery and sound are owned by Herdr, not duplicated by a mod observer.

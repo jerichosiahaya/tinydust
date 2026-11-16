@@ -2,6 +2,7 @@
   "id": "root",
   "type": "row",
   "theme": "tinydust",
+  "toast": "tinydust",
   "preview": "layouts/tinydust.svg",
   "titlebar": "none",
   "traffic_lights": [

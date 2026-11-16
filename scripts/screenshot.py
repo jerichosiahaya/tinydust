@@ -21,9 +21,10 @@ if layout_path.exists() or mod_path.exists():
 x=json.loads((root/'layouts/tinydust.json').read_text())
 def replace(node):
     ident=node.get('id')
-    roles={'spaces':'spaces','sidebar-footer':'footer','tabs':'tabs','status':'status','main':'welcome'}
+    roles={'spaces':'spaces','sidebar-footer':'footer','tabs':'tabs','status':'status'}
     if ident in roles: node['content']={'mod':'tinydust-preview','props':{'role':roles[ident]}}
     if ident in ['agents','journal']: node['content']['props']={'demo':True}
+    if ident=='main': node['content']={'mod':'tinydust','props':{'role':'world','demo':True}}
     if ident=='work-body': node['children']=[child for child in node['children'] if child['id']!='panel']
     for child in node.get('children',[]):replace(child)
 replace(x)
