@@ -1,0 +1,20 @@
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+*.error
+mods/**/gpui-kit.d.ts
+mods/**/herdr.d.ts
+mods/**/jsconfig.json
+# Herdr runtime/user data must never be published.
+data/
+backups/
+.state/
+shared.json
+settings.json
+keys.json
+view.json
+window.json
+*.sock
+.env
+.env.*
