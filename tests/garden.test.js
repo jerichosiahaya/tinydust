@@ -19,18 +19,19 @@ const has=(nodes,id)=>nodes.find(n=>n.attrs?.id?.[0]===id);
 function harness() {
   let properties={},order=[],calls=[],timer=null;
   const preferences=new Map();
-  const spaceList=[{id:'here',active:true,machine:'remote',tabs:[{id:'tab-here'}]}];
+  const spaceList=[{id:'here',name:'Garden',active:true,machine:'remote',tabs:[{id:'tab-here'}]}];
   const paneList=[{pane:'pane-here',tab:'tab-here',focused:true,terminal:'a0'}];
   const data=['working','blocked','done','idle','future'].map((status,i)=>({address:'a'+i,space:'here',status,program:{name:'Agent '+i},tab_name:'Work'}));
   data.push({address:'elsewhere',space:'other',status:'working'});
-  const cx={notify(){},timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}}};
-  const context={View:class{},div:element,image:path=>element().image(path),h_flex:element,v_flex:element,Button:{new:id=>element().id(id)},
+  const cx={notify(){},focus_handle:()=>({focus(){}}),timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}}};
+  const inputState={new:({value=''})=>({text:value,on(){},value(){return this.text;},set_value(value){this.text=value;}})};
+  const context={View:class{},div:element,image:path=>element().image(path),h_flex:element,v_flex:element,Button:{new:id=>element().id(id)},Input:{new:()=>element()},InputState:inputState,
     props:()=>properties,theme:()=>new Proxy({},{get:()=> '#aabbcc'}),shared:k=>preferences.get(k),setShared:(k,v)=>preferences.set(k,v),
     agents:()=>data,spaces:()=>spaceList,panes:()=>paneList,setAgentOrder:v=>order=v,run:(...args)=>calls.push(args),
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
-  for(const file of ['game.js','scene.js','toast.js','creation.js','workbench.js','main.js']){
+  for(const file of ['game.js','scene.js','toast.js','creation.js','workbench.js','spaces.js','main.js']){
     const source=readFileSync(new URL('../mods/tinydust/'+file,import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export (function|const) /g,'$1 ').replace('export default class TinyDust','class TinyDust');
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':''),context);
   }
@@ -65,6 +66,38 @@ test('New menu routes tab, space and terminal to captured targets; stale targets
   assert(has(h.nodes(),'create-open'));assert(!has(h.nodes(),'journal-toggle'));
 });
 
+test('space shortcuts use stable icons, preserve Herdr colors and only switch valid real spaces',()=>{
+  const h=harness();h.spaceList.push({id:'other',name:'Studio',active:false,tabs:[]});
+  h.preferences.set('space.colors',{here:'ansi1',other:'#123456'});h.props({role:'space-shortcuts'});
+  let nodes=h.nodes();assert.equal(has(nodes,'space-shortcut-here').attrs.bg[0],'#d9649a');
+  assert.equal(has(nodes,'space-shortcut-other').attrs.bg[0],'#123456');
+  h.preferences.set('space.colors',{here:'ansi1',other:'#123456aa'});assert.equal(has(h.nodes(),'space-shortcut-other').attrs.bg[0],'#123456aa');
+  assert(has(nodes,'space-shortcut-here').attrs.accessibility_label[0].includes('Selected space'));
+  for(const name of ['flower','house','tree','star'])assert(readFileSync(new URL(`../mods/tinydust/space-${name}.svg`,import.meta.url),'utf8').includes('<svg'));
+  has(nodes,'space-shortcut-other').attrs.on_click[0]();assert.equal(h.calls.at(-1)[0],'space.select');assert.equal(h.calls.at(-1)[1].id,'other');
+  h.spaceList.pop();has(nodes,'space-shortcut-other').attrs.on_click[0]();assert.equal(h.calls.length,1);
+  h.props({role:'space-shortcuts',demo:true});nodes=h.nodes();has(nodes,'space-shortcut-sample-a').attrs.on_click[0]();assert.equal(h.calls.length,1);
+  assert.equal(h.preferences.get('space.colors').here,'ansi1');
+});
+
+test('title font is customizable, validated and demo-safe without touching other fonts',()=>{
+  const h=harness();h.props({role:'brand'});let nodes=h.nodes();
+  assert.equal(has(nodes,'brand-title').attrs.font_family[0],'Silkscreen');
+  has(nodes,'font-open').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].props.role,'font-menu');
+  h.props({role:'font-menu',overlay:'font-popup'});h.garden.init(null,h.cx);
+  let stopped=false;has(h.nodes(),'font-menu').attrs.on_key_down[0]({key:'escape'},{stop_propagation(){stopped=true;}});
+  assert(stopped);assert.equal(h.calls.at(-1)[0],'closeOverlay');
+  h.garden.fontInput.set_value('x'.repeat(101));h.garden.saveFont(h.cx);
+  assert(!h.preferences.has('tinydust.brandFont'));assert(h.garden.fontError);
+  h.garden.fontInput.set_value('  Custom Display  ');h.garden.saveFont(h.cx);
+  assert.equal(h.preferences.get('tinydust.brandFont'),'Custom Display');assert.equal(h.calls.at(-1)[0],'closeOverlay');
+  h.props({role:'brand'});assert.equal(has(h.nodes(),'brand-title').attrs.font_family[0],'Custom Display');
+  h.props({role:'font-menu',demo:true});h.garden.init(null,h.cx);h.garden.fontInput.set_value('Other');h.garden.saveFont(h.cx);
+  assert.equal(h.preferences.get('tinydust.brandFont'),'Custom Display');
+  h.props({role:'font-menu'});h.garden.init(null,h.cx);h.garden.fontInput.set_value('');h.garden.saveFont(h.cx);assert.equal(h.preferences.get('tinydust.brandFont'),null);
+  h.props({role:'brand',demo:true});assert.equal(has(h.nodes(),'brand-title').attrs.font_family[0],'Silkscreen');
+});
+
 test('workbench decoration stays outside the terminal and preserves native pane controls',()=>{
   const h=harness();h.props({role:'workbench'});
   let nodes=h.nodes();assert(has(nodes,'workbench-trim'));assert(nodes.includes('The workbench'));
@@ -92,6 +125,32 @@ test('working agents grow trees; counts stay honest and large scenes stay bounde
   assert.equal(scenePage(list,0,3).agents.length,3);
   for(let i=0;i<6;i++)for(const state of ['working','idle','blocked','done']){
     const spot=sceneSpot(i,state,300);assert(spot.x>=0&&spot.x+54<=300);
+  }
+});
+
+test('sidebar scene is compact at every height and all agents remain reachable',()=>{
+  const h=harness();h.garden.height=1000;
+  let nodes=h.nodes();const scene=has(nodes,'living-farm');
+  assert(scene.attrs.h[0]<310);assert(has(nodes,'unit-a0'));assert(!has(nodes,'unit-a3'));
+  assert(has(nodes,'farmer-a3'));assert.equal(has(nodes,'farmer-a3').attrs.h[0],42);
+  has(nodes,'next-field').attrs.on_click[0]({},h.cx);nodes=h.nodes();assert(has(nodes,'unit-a3'));
+  has(nodes,'farmer-a4').attrs.on_click[0]({},h.cx);assert.equal(h.calls.at(-1)[1].terminal,'a4');
+  h.props({role:'world'});h.garden.width=880;h.garden.page=0;nodes=h.nodes();assert(has(nodes,'unit-a3'));
+});
+
+test('compact trees fit the landscape and their hit targets do not overlap',()=>{
+  const h=harness();h.garden.height=1000;
+  h.data.splice(0,h.data.length,...Array.from({length:24},(_,i)=>({address:`tree-${i}`,space:'here',status:'working',program:{name:`Agent ${i}`} })));
+  for(const width of [240,260,300,480]){
+    h.garden.width=width;const nodes=h.nodes(), ground=Math.min(260,width)*0.7;
+    const trees=Array.from({length:24},(_,i)=>has(nodes,`tree-tree-${i}`));
+    assert(trees.every(Boolean));
+    for(let i=0;i<trees.length;i++){
+      const a=trees[i].attrs,x=a.left[0],y=a.top[0],w=a.w[0],height=a.h[0];
+      assert(x>=0&&x+w<=width+0.001&&y+height<=ground+0.001);
+      if(i%6<5)assert(x+w<=trees[i+1].attrs.left[0]+0.001);
+      if(i<18)assert(y+height<=trees[i+6].attrs.top[0]+0.001);
+    }
   }
 });
 

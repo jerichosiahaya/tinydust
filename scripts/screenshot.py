@@ -13,7 +13,7 @@ parser.add_argument('--terminal',action='store_true',help='Show a mock terminal 
 args=parser.parse_args()
 home=Path(os.environ.get('HERDR_APP_HOME') or Path(os.environ.get('XDG_CONFIG_HOME') or Path.home()/'.config')/'herdr-app')
 def call(*args):
-    return subprocess.check_output(['herdr-app',*args],text=True)
+    return subprocess.check_output(['herdr-app',*args],text=True,timeout=20)
 status=json.loads(call('status'))
 if status.get('overlays'):
     raise SystemExit('Close overlays before capturing; they may contain private data.')
@@ -27,7 +27,7 @@ def replace(node):
     ident=node.get('id')
     roles={'spaces':'spaces','sidebar-footer':'footer','tabs':'tabs','status':'status','workbench-label':'workbench'}
     if ident in roles: node['content']={'mod':'tinydust-preview','props':{'role':roles[ident],**({'terminal':True} if args.terminal and ident=='tabs' else {})}}
-    if ident in ['agents','journal','brand']: node['content']['props']={**node['content'].get('props',{}),'demo':True}
+    if ident in ['agents','journal','brand','space-shortcuts']: node['content']['props']={**node['content'].get('props',{}),'demo':True}
     if ident=='main': node['content']=({'mod':'tinydust-preview','props':{'role':'terminal'}} if args.terminal else {'mod':'tinydust','props':{'role':'world','demo':True}})
     if ident=='work-body': node['children']=[child for child in node['children'] if child['id']!='panel']
     for child in node.get('children',[]):replace(child)

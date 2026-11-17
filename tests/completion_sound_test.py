@@ -109,9 +109,16 @@ class CompletionSoundTests(unittest.TestCase):
         env = {**os.environ, 'HERDR_APP_HOME': str(self.home), 'PATH': str(binary) + os.pathsep + os.environ.get('PATH', '')}
         subprocess.run([sys.executable, str(ROOT / 'scripts/install.py')], env=env, check=True, capture_output=True)
         self.assertEqual((self.home / SOUND).read_bytes(), (ROOT / 'mods/tinydust/harvest-complete.mp3').read_bytes())
+        font = Path('mods/tinydust/fonts/Silkscreen-Regular.ttf')
+        license_file = Path('mods/tinydust/fonts/OFL-Silkscreen.txt')
+        self.assertEqual((self.home / font).read_bytes(), (ROOT / font).read_bytes())
+        self.assertEqual((self.home / license_file).read_bytes(), (ROOT / license_file).read_bytes())
         self.assertEqual(self.read()['sounds'], {'enabled': False, 'done': SOUND})
         self.store({'sounds': {'done': 'leave-this.mp3'}})
+        personal = self.home / 'mods/tinydust/fonts/MyFont.ttf'
+        personal.write_bytes(b'personal font')
         subprocess.run([sys.executable, str(ROOT / 'scripts/install.py'), '--update', '--keep-sound'], env=env, check=True, capture_output=True)
+        self.assertEqual(personal.read_bytes(), b'personal font')
         self.assertEqual(self.read()['sounds']['done'], 'leave-this.mp3')
 
 

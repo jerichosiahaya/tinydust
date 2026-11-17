@@ -20,6 +20,9 @@ if not (home/'AGENTS.md').exists():
 files = [Path('layouts/tinydust.json'), Path('layouts/tinydust.svg'), Path('themes/tinydust.json')]
 for mod in ['tinydust', 'tinydust-journal']:
     files += [p.relative_to(root) for p in (root/'mods'/mod).iterdir() if p.suffix in ['.js','.json','.svg','.mp3'] and p.name != 'jsconfig.json']
+    font_dir = root/'mods'/mod/'fonts'
+    if font_dir.exists():
+        files += [p.relative_to(root) for p in font_dir.iterdir() if p.is_file() and p.suffix in ['.ttf','.otf','.txt']]
 conflicts = [f for f in files if (home/f).exists()]
 if conflicts and not args.update:
     raise SystemExit('TinyDust files already exist. Use --update to replace them with a backup.')

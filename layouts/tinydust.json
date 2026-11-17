@@ -49,6 +49,21 @@
           "type": "column",
           "children": [
             {
+              "id": "space-shortcuts",
+              "type": "block",
+              "size": {
+                "px": 36
+              },
+              "min": 36,
+              "max": 36,
+              "content": {
+                "mod": "tinydust",
+                "props": {
+                  "role": "space-shortcuts"
+                }
+              }
+            },
+            {
               "id": "spaces",
               "type": "block",
               "size": {

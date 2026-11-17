@@ -7,9 +7,12 @@ export default class Preview extends View {
   init(){this.width=300;}
   render() {
     const t=theme(),role=props()?.role;
-    if(role==='spaces')return v_flex().size_full().p(12).gap(9)
-      .child(div().text_size(11).text_color(t.muted).child('Spaces · sample workspace'))
-      .child(div().p(9).rounded(3).bg(t.selected).text_size(13).child('Sunrise farm'));
+    if(role==='spaces')return v_flex().size_full().px(8).gap(2)
+      .child(div().h(29).px(4).flex().items_center().text_size(11).text_color(t.muted).child('Spaces · sample'))
+      .children([['Sunrise farm','#d9649a',true],['Garden studio','#22a99a',false],['Meadow notes','#5b8def',false]].map(([name,color,active])=>
+        h_flex().h(28).px(6).gap(8).items_center().rounded(4).when(active,e=>e.bg(t.selected))
+          .child(div().w(18).h(18).rounded(4).bg(color).flex().items_center().justify_center().text_size(10).text_color('#ffffff').child(name[0]))
+          .child(div().text_size(12).text_color(t.foreground).child(name))));
     if(role==='workbench')return workbench(t,this.width).on_size_change((size,cx)=>{if(size.width!==this.width){this.width=size.width;cx.notify();}});
     if(role==='terminal')return v_flex().size_full().min_w(0).min_h(0).rounded(6).border(2).border_color(t.accent).bg(t.background).overflow_hidden()
       .child(h_flex().h(30).px(10).gap(8).items_center().flex_none().border_b(1).border_color(t.border)
