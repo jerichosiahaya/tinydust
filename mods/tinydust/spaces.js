@@ -19,10 +19,10 @@ function badge(s,t,colors,demo,rail,states,motion) {
   const description=statusDescription(states);
   const label=`${s.active?"Selected space":"Switch to space"}: ${s.name}${s.machine?` · ${s.machine}`:""}${description?` · ${description}`:status?` · ${status}`:""}`;
   return Button.new(`${rail?"space-rail":"space-shortcut"}-${s.id}`).accessibility_label(label).tooltip(label)
-    .w(40).h(30).flex_none().items_center().gap(1)
+    .w(35).h(30).flex_none().items_center()
     .on_click(()=>{if(!demo&&spaces().some(space=>space.id===s.id))run("space.select",{id:s.id});})
     .on_mouse_down("right",(_e,cx)=>{if(!demo&&rail&&spaces().some(space=>space.id===s.id)){cx.stop_propagation();openOverlay({mod:"menu",kind:"popup",width:200,height:260,props:{tab:"space",target:{id:s.id}}});}})
-    .child(h_flex().w(28).h(28).flex_none().items_center().justify_center().rounded(5).bg(fill)
+    .child(h_flex().w(26).h(26).flex_none().items_center().justify_center().rounded(5).bg(fill)
       .border(s.active?2:1).border_color(s.active?t.foreground:t.border)
       .child(image(`mods/tinydust/space-${spaceIcon(s.id)}.svg`).w(16).h(16).flex_none()))
     .child(statusMarks(s.id,states,t,motion,true));
@@ -35,7 +35,7 @@ function entries(demo) {
 }
 export function spaceShortcuts(t,demo=false) {
   const [list,colors,states,motion]=entries(demo);
-  return h_flex().id("space-shortcuts").size_full().min_w(0).px(8).gap(6).items_center().overflow_x_scrollbar()
+  return h_flex().id("space-shortcuts").size_full().min_w(0).px(8).gap(1).items_center().overflow_x_scrollbar()
     .children(list.map(s=>badge(s,t,colors,demo,false,states.get(s.id),motion)));
 }
 export function compactSpaces(t,demo=false) {

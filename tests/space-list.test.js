@@ -43,10 +43,11 @@ test('named spaces show distinct simultaneous status symbols and honor motion pr
   assert(has(nodes,'space-sign-name-two-done'));assert(!has(nodes,'space-sign-name-two-working'));
   assert(flat(row).includes('!'));assert(flat(row).includes('✓'));assert(flat(row).includes('●'));
   for(const label of ['Needs attention','Finished, not yet seen','Working'])assert(row.attrs.accessibility_label[0].includes(label));
-  assert(!has(nodes,'space-sign-name-one-working').attrs.loop);
-  h.prefs.set('tinydust.motion',true);nodes=h.nodes();assert.equal(has(nodes,'space-sign-name-one-working').attrs.loop[0],'opacity');
-  assert(!has(nodes,'space-sign-name-one-done').attrs.loop);assert(!has(nodes,'space-sign-name-one-blocked').attrs.loop);
-  h.prefs.set('tinydust.quiet',true);nodes=h.nodes();assert(!has(nodes,'space-sign-name-one-working').attrs.loop);
+  const glyph=(all,status)=>has(all,`space-sign-name-one-${status}`).nodes[0];
+  assert(!glyph(nodes,'working').attrs.loop);assert(!has(nodes,'space-sign-name-one-working').attrs.bg,'named symbols do not use bright tiles');
+  h.prefs.set('tinydust.motion',true);nodes=h.nodes();assert.equal(glyph(nodes,'working').attrs.loop[0],'opacity');assert.equal(glyph(nodes,'working').attrs.loop[1].from,0.8);
+  assert(!glyph(nodes,'done').attrs.loop);assert(!glyph(nodes,'blocked').attrs.loop);
+  h.prefs.set('tinydust.quiet',true);nodes=h.nodes();assert(!glyph(nodes,'working').attrs.loop);
   h.agents.find(a=>a.space==='one'&&a.status==='done').status='idle';nodes=h.nodes();
   assert(!has(nodes,'space-sign-name-one-done'));assert(has(nodes,'space-sign-name-two-done'));
   assert(has(nodes,'space-sign-name-one-working'));assert(has(nodes,'space-sign-name-one-blocked'));
@@ -72,6 +73,18 @@ test('the adapted list restores existing machine-folding and reconnect state',()
   const h=harness({'machines.folded':'["sample-remote"]','machines.reconnecting':'{"sample-remote":{"busy":true,"removed":true}}'});
   assert(h.list.folded.has('sample-remote'));assert.equal(h.list.reconnecting['sample-remote'].removed,true);
   assert.equal(h.list.reconnecting['sample-remote'].busy,false);
+});
+
+test('the TinyDust theme keeps symbols readable during the subtle pulse',()=>{
+  const theme=JSON.parse(readFileSync(new URL('../themes/tinydust.json',import.meta.url),'utf8')).colors;
+  const rgb=hex=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
+  const luminance=c=>c.map(x=>x/255).map(x=>x<=0.04045?x/12.92:((x+0.055)/1.055)**2.4).reduce((s,v,i)=>s+v*[0.2126,0.7152,0.0722][i],0);
+  const contrast=(a,b)=>{const [x,y]=[luminance(a),luminance(b)].sort((a,b)=>b-a);return (x+0.05)/(y+0.05);};
+  const fg=rgb(theme.foreground);
+  for(const background of [theme.raised,theme.selected,theme.hover,theme.chrome]){
+    const bg=rgb(background),pulse=fg.map((x,i)=>0.8*x+0.2*bg[i]);
+    assert(contrast(fg,bg)>=4.5,background);assert(contrast(pulse,bg)>=4.5,`pulsing ${background}`);
+  }
 });
 
 test('both space surfaces use the same status rules',()=>{

@@ -107,11 +107,12 @@ test('space symbols follow individual agent states without relying on color or m
   assert(!has(nodes,'space-sign-icon-empty-working'));const label=has(nodes,'space-shortcut-here').attrs.accessibility_label[0];
   for(const text of ['Needs attention','Finished, not yet seen','Working'])assert(label.includes(text));
   assert(flat(has(nodes,'space-shortcut-here')).includes('!'));assert(flat(has(nodes,'space-shortcut-here')).includes('✓'));assert(flat(has(nodes,'space-shortcut-here')).includes('●'));
-  assert(!has(nodes,'space-sign-icon-here-working').attrs.loop,'symbols are static when motion is off');
+  const glyph=(all,status)=>has(all,`space-sign-icon-here-${status}`).nodes[0];
+  assert(!glyph(nodes,'working').attrs.loop,'symbols are static when motion is off');
   const preferences=JSON.stringify([...h.preferences]);
-  h.preferences.set('tinydust.motion',true);nodes=h.nodes();assert.equal(has(nodes,'space-sign-icon-here-working').attrs.loop[0],'opacity');
-  assert(!has(nodes,'space-sign-icon-here-done').attrs.loop);assert(!has(nodes,'space-sign-icon-here-blocked').attrs.loop);
-  h.preferences.set('tinydust.quiet',true);nodes=h.nodes();assert(has(nodes,'space-sign-icon-here-working'));assert(!has(nodes,'space-sign-icon-here-working').attrs.loop);
+  h.preferences.set('tinydust.motion',true);nodes=h.nodes();assert.equal(glyph(nodes,'working').attrs.loop[0],'opacity');
+  assert(!glyph(nodes,'done').attrs.loop);assert(!glyph(nodes,'blocked').attrs.loop);
+  h.preferences.set('tinydust.quiet',true);nodes=h.nodes();assert(has(nodes,'space-sign-icon-here-working'));assert(!glyph(nodes,'working').attrs.loop);
   h.preferences.set('tinydust.quiet',false);h.props({role:'compact-spaces'});nodes=h.nodes();
   for(const status of ['working','done','blocked'])assert(has(nodes,`space-sign-icon-here-${status}`));
   h.data[0].status='idle';nodes=h.nodes();assert(!has(nodes,'space-sign-icon-here-working'));assert(has(nodes,'space-sign-icon-here-done'));assert(has(nodes,'space-sign-icon-other-working'));
@@ -124,6 +125,18 @@ test('space symbols follow individual agent states without relying on color or m
   const count=h.calls.length;h.props({role:'space-shortcuts',demo:true});nodes=h.nodes();
   assert(has(nodes,'space-sign-icon-sample-a-working'));assert(has(nodes,'space-sign-icon-sample-a-blocked'));assert(has(nodes,'space-sign-icon-sample-c-done'));assert(!has(nodes,'space-sign-icon-sample-b-working'));
   assert.equal(h.calls.length,count);
+});
+
+test('shortcut tiles stay compact while keeping simultaneous status marks in bounds',()=>{
+  const h=harness();h.props({role:'space-shortcuts'});const nodes=h.nodes(),button=has(nodes,'space-shortcut-here');
+  assert.equal(button.attrs.w[0],35);assert.equal(has(nodes,'space-shortcuts').attrs.gap[0],1);
+  const tile=button.nodes[0],stack=button.nodes[1];assert.equal(tile.attrs.w[0],26);assert.equal(stack.attrs.w[0],9);assert.equal(stack.attrs.h[0],30);
+  assert.equal(tile.attrs.w[0]+stack.attrs.w[0],button.attrs.w[0],'status column must not cover the icon or overlap its neighbor');
+  for(const status of ['blocked','done','working']){
+    const mark=has(nodes,`space-sign-icon-here-${status}`);assert.equal(mark.attrs.w[0],9);assert.equal(mark.attrs.h[0],10);
+    assert(mark.attrs.bg,'icon symbols have a stable themed background');
+  }
+  h.props({role:'compact-spaces'});assert.equal(has(h.nodes(),'space-rail-here').attrs.w[0],35);
 });
 
 test('compact spaces show colored icons, target the exact space, and keep demo actions safe',()=>{
