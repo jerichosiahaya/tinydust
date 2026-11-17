@@ -1,6 +1,6 @@
 import {div,image} from "gpui-kit";
 import {Button} from "gpui-base";
-import {characterFor,STATES,UNKNOWN,grove,sceneSpot} from "./game.js";
+import {characterFor,STATES,UNKNOWN,sceneSpot} from "./game.js";
 
 const r=(x,y,w,h,c)=>div().absolute().left(x).top(y).w(w).h(h).bg(c);
 
@@ -17,8 +17,8 @@ export function actor(address,status,motion,size=54) {
 }
 
 // One visible plot per character. Native motion only; no frame-polling timer.
-export function farmScene(all,shown,{width,motion,expanded=false,shaken=null,onTree,onAgent}) {
-  const land=grove(all), sceneWidth=Math.max(240,expanded?Math.min(width,960):width);
+export function farmScene(land,shown,{width,motion,expanded=false,shaken=null,onTree,onAgent}) {
+  const sceneWidth=Math.max(240,expanded?Math.min(width,960):width);
   const artWidth=expanded?Math.min(420,sceneWidth*0.5):Math.min(260,sceneWidth), top=artWidth*0.7;
   const rows=Math.max(1,Math.ceil(shown.length/3));
   const rowHeight=expanded?140:96, size=expanded?72:46, scale=size/54;
@@ -32,9 +32,9 @@ export function farmScene(all,shown,{width,motion,expanded=false,shaken=null,onT
     const x=orchardX+(i%cols)*(orchardW/cols),y=(expanded?top*38/112+15:Math.max(0,top-treeStep*4))+Math.floor(i/cols)*treeStep;
     let art=image("mods/tinydust/tree.svg").w(treeW).h(treeW*1.25);
     if(motion&&shaken===a.address)art=art.relative().loop("left",{from:-2,to:2,period:170,easing:"ease-in-out"});
-    return Button.new(`tree-${a.address}`).accessibility_label(`Tree for ${a.program?.name||"agent"} ${a.address}`)
+    return Button.new(`tree-${a.address}`).accessibility_label(`Tree for ${a.name||"agent"} ${a.address}`)
       .absolute().left(x).top(y).w(expanded?Math.max(20,treeW):treeW).h(Math.max(28,treeW*1.25))
-      .tooltip(`A tree for ${a.program?.name||"agent"} · working in this space`)
+      .tooltip(`A tree for ${a.name||"agent"} · planted in this space`)
       .on_click((_e,cx)=>onTree(a,cx)).child(art);
   });
   return div().id("living-farm").relative().w(sceneWidth).h(height).flex_none().overflow_hidden().bg("#8eaa83")
@@ -46,7 +46,7 @@ export function farmScene(all,shown,{width,motion,expanded=false,shaken=null,onT
     .when(expanded,e=>e.children([
       r(artWidth+90,top*29/112,160,top*9/112,"#96a79f"),
       r(artWidth+300,top*32/112,180,top*6/112,"#9caea4"),
-      div().absolute().left(orchardX).top(top*38/112-4).text_size(11).text_color("#2b3d32").font_semibold().child("The working grove"),
+      div().absolute().left(orchardX).top(top*38/112-4).text_size(11).text_color("#2b3d32").font_semibold().child("Your grove"),
     ]))
     .children(trees)
     .child(r(0,top-5,sceneWidth,9,"#c3ad88"))

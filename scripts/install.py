@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 from completion_sound import configure_sound
 
 root = Path(__file__).resolve().parents[1]
@@ -23,6 +24,8 @@ for mod in ['tinydust', 'tinydust-journal']:
     font_dir = root/'mods'/mod/'fonts'
     if font_dir.exists():
         files += [p.relative_to(root) for p in font_dir.iterdir() if p.is_file() and p.suffix in ['.ttf','.otf','.txt']]
+# Dependencies first, entry points next, and the layout last.
+files.sort(key=lambda f: (2 if f == Path('layouts/tinydust.json') else 1 if f.name == 'main.js' else 0, str(f)))
 conflicts = [f for f in files if (home/f).exists()]
 if conflicts and not args.update:
     raise SystemExit('TinyDust files already exist. Use --update to replace them with a backup.')
@@ -33,9 +36,21 @@ if conflicts:
         (backup/f).parent.mkdir(parents=True,exist_ok=True)
         shutil.copy2(home/f,backup/f)
     print('Previous code saved to', backup)
-for f in files:
-    (home/f).parent.mkdir(parents=True,exist_ok=True)
-    shutil.copy2(root/f, home/f)
+changed = [f for f in files if not (home/f).is_file() or (root/f).read_bytes() != (home/f).read_bytes()]
+staged = []
+try:
+    for f in changed:
+        (home/f).parent.mkdir(parents=True,exist_ok=True)
+        fd, name = tempfile.mkstemp(prefix='.tinydust-install-', dir=(home/f).parent)
+        os.close(fd)
+        staged.append((Path(name), home/f))
+        shutil.copy2(root/f, name)
+        os.utime(name, None)
+    for temporary, destination in staged:
+        os.replace(temporary, destination)
+finally:
+    for temporary, _ in staged:
+        temporary.unlink(missing_ok=True)
 for mod in ['tinydust','tinydust-journal']:
     subprocess.run(['herdr-app','check',str(home/'mods'/mod)],check=True)
 try:

@@ -117,8 +117,33 @@ class CompletionSoundTests(unittest.TestCase):
         self.store({'sounds': {'done': 'leave-this.mp3'}})
         personal = self.home / 'mods/tinydust/fonts/MyFont.ttf'
         personal.write_bytes(b'personal font')
-        subprocess.run([sys.executable, str(ROOT / 'scripts/install.py'), '--update', '--keep-sound'], env=env, check=True, capture_output=True)
+        unchanged = self.home / 'mods/tinydust/main.js'
+        os.utime(unchanged, ns=(1_000_000_000, 1_000_000_000))
+        before_mtime = unchanged.stat().st_mtime_ns
+        changed = self.home / 'mods/tinydust/spaces.js'
+        changed.write_bytes(b'old version')
+        script = ROOT / 'scripts/install.py'
+        fail = '''import os, runpy, sys
+from pathlib import Path
+original = os.replace
+def replace(src, dst):
+    if Path(dst).name == 'spaces.js': raise PermissionError('simulated replacement failure')
+    return original(src, dst)
+os.replace = replace
+sys.path.insert(0, str(Path(sys.argv[1]).parent))
+sys.argv = [sys.argv[1], '--update', '--keep-sound']
+runpy.run_path(sys.argv[0], run_name='__main__')
+'''
+        failed = subprocess.run([sys.executable, '-c', fail, str(script)], env=env, capture_output=True)
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertEqual(changed.read_bytes(), b'old version', 'failed replacement must not truncate the installed module')
+        self.assertEqual(list(self.home.rglob('.tinydust-install-*')), [])
+        subprocess.run([sys.executable, str(script), '--update', '--keep-sound'], env=env, check=True, capture_output=True)
         self.assertEqual(personal.read_bytes(), b'personal font')
+        self.assertEqual(unchanged.stat().st_mtime_ns, before_mtime, 'unchanged mods should not hot-reload')
+        self.assertEqual(changed.read_bytes(), (ROOT / 'mods/tinydust/spaces.js').read_bytes())
+        self.assertTrue(any(p.read_bytes() == b'old version' for p in (self.home / 'backups').glob('tinydust-*/mods/tinydust/spaces.js')))
+        self.assertEqual(list(self.home.rglob('.tinydust-install-*')), [])
         self.assertEqual(self.read()['sounds']['done'], 'leave-this.mp3')
 
 

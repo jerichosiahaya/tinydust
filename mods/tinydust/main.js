@@ -7,6 +7,7 @@ import {toastView} from "./toast.js";
 import {creationTarget,creationMenu} from "./creation.js";
 import {workbench} from "./workbench.js";
 import {spaceShortcuts} from "./spaces.js";
+import {GROVE_KEY,readGroves,rememberAgents,clearGrove} from "./grove.js";
 
 const SAMPLE=[
   {address:"sample-1",space:"sample",program:{name:"Builder"},tab_name:"Plant the first seed",status:"working"},
@@ -20,7 +21,7 @@ const button=(id,text,action)=>Button.new(id).accessibility_label(text).h(30).px
 
 export default class TinyDust extends View {
   init(_p,cx) {
-    if(props()?.role==="create-menu"){this.menuHandle=cx.focus_handle();this.menuHandle.focus();}
+    if(props()?.role==="create-menu"||props()?.role==="clear-grove"){this.menuHandle=cx.focus_handle();this.menuHandle.focus();this.clearError="";}
     if(props()?.role==="font-menu"){
       const current=props()?.demo?null:shared("tinydust.brandFont");
       this.fontInput=InputState.new({value:typeof current==="string"?current:"",placeholder:"Silkscreen (default)"});
@@ -30,7 +31,7 @@ export default class TinyDust extends View {
     }
     this.width=props()?.role==="world"?880:300;this.height=600;this.page=0;
     this.demoMotion=false;this.demoSelected=null;this.lastFocused=null;
-    this.shaken=null;this.treeTask=null;this.treeMessage="";
+    this.shaken=null;this.treeTask=null;this.treeMessage="";this.treeAddress=null;
   }
   saveFont(cx) {
     const font=this.fontInput.value().trim();
@@ -38,13 +39,23 @@ export default class TinyDust extends View {
     if(!props()?.demo)setShared("tinydust.brandFont",font||null);
     if(props()?.overlay)closeOverlay(props().overlay);
   }
+  clearGrove(cx) {
+    const p=props()??{};
+    if(p.demo){if(p.overlay)closeOverlay(p.overlay);return;}
+    if(!p.spaceId||spaces().find(s=>s.active)?.id!==p.spaceId){this.clearError="The selected space changed. Nothing was cleared.";cx.notify();return;}
+    try {
+      const state=readGroves(shared(GROVE_KEY));
+      setShared(GROVE_KEY,clearGrove(state,p.spaceId,agents()));
+      if(p.overlay)closeOverlay(p.overlay);
+    } catch {this.clearError="Could not clear the grove. Saved data was not intentionally replaced.";cx.notify();}
+  }
   focus(a,cx) {
     if(props()?.demo){this.demoSelected=a.address;cx?.notify();return;}
     if(props()?.overlay)closeOverlay(props().overlay);
     run("agent.focus",{terminal:a.address});
   }
   touchTree(a,cx,motion) {
-    this.treeMessage=`A tree for ${a.program?.name||"this agent"} · ${characterFor(a.address)[1]}`;
+    this.treeMessage=`A tree for ${a.name||"this agent"} · ${characterFor(a.address)[1]}`;this.treeAddress=a.address;
     this.treeTask?.cancel();this.treeTask=null;
     this.shaken=motion?a.address:null;
     if(motion)this.treeTask=cx.timer.after(1000,cx=>{this.shaken=null;this.treeTask=null;cx.notify();});
@@ -53,6 +64,15 @@ export default class TinyDust extends View {
   render() {
     const p=props()??{},demo=p.demo===true,expanded=p.role==="world",t=theme();
     if(p.role==="create-menu")return creationMenu(p,t).when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle));
+    if(p.role==="clear-grove")return v_flex().id("clear-grove-menu").size_full().p(12).gap(10).bg(t.popover)
+      .when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
+      .on_key_down((event,cx)=>{if(String(event.key).toLowerCase()==="escape"&&p.overlay){closeOverlay(p.overlay);cx.stop_propagation();}})
+      .child(div().text_size(14).font_semibold().text_color(t.foreground).child("Clear this grove?"))
+      .child(div().text_size(11).text_color(t.muted).child("This clears this space's trees and cannot be undone. Agents already here will not immediately replant."))
+      .when(Boolean(this.clearError),e=>e.child(div().text_size(11).text_color(t.blocked).child(this.clearError)))
+      .child(h_flex().gap(6).child(button("clear-confirm","Clear grove",(_e,cx)=>this.clearGrove(cx)).bg(t.blocked).text_color(t.accent_foreground))
+        .child(button("clear-cancel","Cancel",()=>{if(p.overlay)closeOverlay(p.overlay);})))
+      .child(div().text_size(10).text_color(t.dim).child("Other spaces are unchanged."));
     if(p.role==="font-menu")return v_flex().id("font-menu").size_full().p(12).gap(9).bg(t.popover)
       .when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
       .on_key_down((event,cx)=>{if(String(event.key).toLowerCase()==="escape"&&p.overlay){closeOverlay(p.overlay);cx.stop_propagation();}})
@@ -89,9 +109,18 @@ export default class TinyDust extends View {
     const narrow=this.width<240, capacity=expanded?6:3;
     const focusIndex=list.findIndex(a=>a.focused);
     if(focusIndex>=0&&list[focusIndex].address!==this.lastFocused){this.lastFocused=list[focusIndex].address;this.page=Math.floor(focusIndex/capacity);}
-    const page=scenePage(list,this.page,capacity),trees=grove(list);
+    let archive=null,gardenError="";
+    try {
+      const saved=readGroves(demo?null:shared(GROVE_KEY));
+      archive=rememberAgents(saved,all);
+      if(!demo&&archive!==saved)setShared(GROVE_KEY,archive);
+    } catch {archive=null;gardenError="Could not read or save the grove; its stored data was not reset.";}
+    const page=scenePage(list,this.page,capacity),trees=grove(archive?.spaces.find(item=>item.id===space?.id)?.trees??[]);
+    if(this.treeAddress&&!trees.visible.some(tree=>tree.address===this.treeAddress)){
+      this.treeTask?.cancel();this.treeTask=null;this.shaken=null;this.treeAddress=null;this.treeMessage="";
+    }
     this.page=page.page;
-    const garden=()=>farmScene(list,page.agents,{width:this.width,motion,expanded,shaken:this.shaken,
+    const garden=()=>farmScene(trees,page.agents,{width:this.width,motion,expanded,shaken:this.shaken,
       onTree:(a,cx)=>this.touchTree(a,cx,motion),onAgent:(a,cx)=>this.focus(a,cx)});
     const controls=()=>h_flex().h(34).px(8).gap(6).items_center().flex_none()
       .child(button("motion",quiet?"Resume game":motion?"Motion on":"Motion off",(_e,cx)=>{
@@ -100,6 +129,7 @@ export default class TinyDust extends View {
       .when(!expanded,e=>e.child(button("visit-farm","Visit farm",()=>openOverlay({mod:"tinydust",kind:"dialog",width:940,height:720,props:{role:"world",...(demo?{demo:true}:{})}}))))
       .when(expanded&&Boolean(p.overlay),e=>e.child(button("leave-farm","Back to work",()=>closeOverlay(p.overlay))))
       .child(div().flex_1())
+      .when(expanded,e=>e.child(button("clear-grove","Clear grove",()=>openOverlay({mod:"tinydust",kind:"popup",width:340,height:220,props:{role:"clear-grove",spaceId:space?.id,...(demo?{demo:true}:{})}})).disabled(!space||!archive||!trees.count)))
       .when(expanded&&!demo,e=>e.child(button("alert-settings","Alert settings",()=>run("app.settings",{section:"alerts"}))));
     const pager=()=>h_flex().h(32).px(8).gap(5).items_center().flex_none()
       .child(div().flex_1().text_size(10.5).text_color(t.muted).child(`${page.page+1} / ${page.pages} · ${list.length} farmhands`))
@@ -112,9 +142,9 @@ export default class TinyDust extends View {
           .child(div().text_size(expanded?16:12).font_semibold().child(expanded?"Your little corner · farm visit":"Your little corner"))
           .when(expanded&&demo,e=>e.child(div().text_size(11).text_color(t.muted).child("Sample farm · no live agents"))))
         .child(controls())
-        .child(div().h(25).px(12).flex_none().text_size(11).text_color(t.muted)
-          .tooltip("One tree per currently working agent in this space; up to 24 trees drawn. This is activity, not a productivity score.")
-          .child(`${trees.count} working · ${trees.count} ${trees.count===1?"tree":"trees"}${trees.count>trees.visible.length?` (${trees.visible.length} shown)`:""}`)))
+        .child(div().h(25).px(12).flex_none().truncate().text_size(11).text_color(gardenError?t.blocked:t.muted)
+          .tooltip(gardenError||"One tree for each agent terminal seen in this space. Trees stay after agents leave; up to 24 are drawn.")
+          .child(gardenError||`${trees.count} ${trees.count===1?"tree":"trees"}${trees.count>trees.visible.length?` (${trees.visible.length} shown)`:""} · ${list.filter(a=>a.status==="working").length} working`)))
       .when(expanded,e=>e.child(v_flex().id("farm-visit-scroll").flex_1().min_h(0).items_center().overflow_y_scrollbar().child(garden())))
       .when(!expanded&&!narrow&&!quiet&&this.height>500,e=>e.child(garden()))
       .when(!narrow&&(expanded||(!quiet&&this.height>500)),e=>e.child(pager()))

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {grove,scenePage,sceneSpot,characterFor,TREE_LIMIT} from '../mods/tinydust/game.js';
+import {GROVE_KEY,readGroves,rememberAgents,clearGrove} from '../mods/tinydust/grove.js';
 
 function element() {
   const target={nodes:[],attrs:{}};
@@ -16,9 +17,8 @@ function element() {
 }
 const flat=n=>typeof n==='string'?[n]:[n,...n.nodes.flatMap(flat)];
 const has=(nodes,id)=>nodes.find(n=>n.attrs?.id?.[0]===id);
-function harness() {
+function harness(preferences=new Map()) {
   let properties={},order=[],calls=[],timer=null;
-  const preferences=new Map();
   const spaceList=[{id:'here',name:'Garden',active:true,machine:'remote',tabs:[{id:'tab-here'}]}];
   const paneList=[{pane:'pane-here',tab:'tab-here',focused:true,terminal:'a0'}];
   const data=['working','blocked','done','idle','future'].map((status,i)=>({address:'a'+i,space:'here',status,program:{name:'Agent '+i},tab_name:'Work'}));
@@ -31,7 +31,7 @@ function harness() {
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
-  for(const file of ['game.js','scene.js','toast.js','creation.js','workbench.js','spaces.js','main.js']){
+  for(const file of ['game.js','grove.js','scene.js','toast.js','creation.js','workbench.js','spaces.js','main.js']){
     const source=readFileSync(new URL('../mods/tinydust/'+file,import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export (function|const) /g,'$1 ').replace('export default class TinyDust','class TinyDust');
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':''),context);
   }
@@ -113,10 +113,10 @@ test('workbench decoration stays outside the terminal and preserves native pane 
   assert.equal(layout.terminal_padding[0],14);assert.equal(layout.terminal_padding[1],12);
 });
 
-test('working agents grow trees; counts stay honest and large scenes stay bounded',()=>{
+test('persistent grove counts stay honest and large scenes stay bounded',()=>{
   const list=Array.from({length:40},(_,i)=>({address:'a'+i,status:i<30?'working':'idle'}));
-  assert.equal(grove(list).count,30);assert.equal(grove(list).visible.length,TREE_LIMIT);
-  list[0].status='done';assert.equal(grove(list).count,29);
+  assert.equal(grove(list).count,40);assert.equal(grove(list).visible.length,TREE_LIMIT);
+  list[0].status='done';assert.equal(grove(list).count,40);
   assert.equal(grove([]).count,0);
   const seen=[];
   for(let page=0;page<scenePage(list).pages;page++)seen.push(...scenePage(list,page).agents);
@@ -126,6 +126,75 @@ test('working agents grow trees; counts stay honest and large scenes stay bounde
   for(let i=0;i<6;i++)for(const state of ['working','idle','blocked','done']){
     const spot=sceneSpot(i,state,300);assert(spot.x>=0&&spot.x+54<=300);
   }
+});
+
+test('grove state deduplicates agent terminals per space without recording conversations',()=>{
+  const base=readGroves(null), sample=[
+    {space:'garden',address:'t1',status:'idle',program:{name:'Builder'},title:'private title'},
+    {space:'garden',address:'t1',status:'working',program:{name:'Builder'}},
+    {space:'studio',address:'t1',status:'done',program:{name:'Writer'}},
+  ];
+  const grown=rememberAgents(base,sample);assert.equal(base.spaces.length,0);
+  assert.deepEqual(grown.spaces.map(s=>[s.id,s.trees.length]),[['garden',1],['studio',1]]);
+  assert.deepEqual(grown.spaces[0].trees,[{address:'t1',name:'Builder'}]);
+  assert.equal(rememberAgents(grown,sample),grown);
+  assert.equal(rememberAgents(grown,[]),grown);
+  const cleared=clearGrove(grown,'garden',sample);assert.equal(cleared.spaces[0].trees.length,0);
+  assert.deepEqual(cleared.spaces[0].ignored,['t1']);assert.equal(cleared.spaces[1].trees.length,1);
+  assert.equal(rememberAgents(cleared,sample),cleared);
+  const newAgent={space:'garden',address:'t2',program:{name:'New'}};
+  assert.deepEqual(rememberAgents(cleared,[...sample,newAgent]).spaces[0].trees,[{address:'t2',name:'New'}]);
+});
+
+test('invalid or future grove data is rejected without being reset',()=>{
+  for(const value of ['broken',[],{version:2,spaces:[]},{version:1,spaces:null},
+    {version:1,spaces:[{id:'x',trees:[{address:'a',name:'A'}],ignored:['a']}]},
+    {version:1,spaces:[{id:'x',trees:[],ignored:[]},{id:'x',trees:[],ignored:[]}]}])
+    assert.throws(()=>readGroves(value));
+  const h=harness(),corrupt={version:2,spaces:[]};h.preferences.set(GROVE_KEY,corrupt);
+  assert(h.nodes().some(n=>typeof n==='string'&&n.includes('Could not read or save the grove')));
+  assert.equal(h.preferences.get(GROVE_KEY),corrupt);
+  h.props({role:'clear-grove',spaceId:'here',overlay:'confirm'});h.garden.init(null,h.cx);h.garden.clearGrove(h.cx);
+  assert(h.garden.clearError);assert.equal(h.preferences.get(GROVE_KEY),corrupt);
+});
+
+test('a synchronous shared-storage failure and demo mode never overwrite a grove',()=>{
+  const prefs=new Map(),h=harness(prefs);prefs.set=()=>{throw new Error('storage unavailable');};
+  assert(h.nodes().some(n=>typeof n==='string'&&n.includes('Could not read or save the grove')));
+  assert.equal(prefs.size,0);
+  const sample=harness();sample.props({role:'world',demo:true});sample.garden.width=880;
+  assert(has(sample.nodes(),'tree-sample-1'));assert(!sample.preferences.has(GROVE_KEY));
+  sample.props({role:'clear-grove',spaceId:'sample',demo:true,overlay:'demo-clear'});sample.garden.init(null,sample.cx);
+  sample.garden.clearGrove(sample.cx);assert(!sample.preferences.has(GROVE_KEY));
+});
+
+test('groves survive completion, disappearance and a new view; other spaces stay separate',()=>{
+  const h=harness();let nodes=h.nodes();assert(has(nodes,'tree-a0'));assert(has(nodes,'tree-a4'));
+  h.data[0].status='done';h.data.splice(0,5);nodes=h.nodes();
+  assert(has(nodes,'tree-a0'));assert(has(nodes,'tree-a4'));assert(!has(nodes,'tree-elsewhere'));
+  has(nodes,'tree-a0').attrs.on_click[0]({},h.cx);assert(h.garden.treeMessage.includes('Agent 0'));
+  const h2=harness(h.preferences);h2.data.splice(0,5);nodes=h2.nodes();
+  assert(has(nodes,'tree-a0'));assert(has(nodes,'tree-a4'));assert(!has(nodes,'tree-elsewhere'));
+  const state=h2.preferences.get(GROVE_KEY);assert.equal(state.spaces.find(s=>s.id==='here').trees.length,5);
+  assert.equal(state.spaces.find(s=>s.id==='other').trees.length,1);
+  h2.data.push({space:'here',address:'new-agent',status:'idle',program:{name:'New'}});
+  assert(has(h2.nodes(),'tree-new-agent'));assert.equal(h2.preferences.get(GROVE_KEY).spaces.find(s=>s.id==='here').trees.length,6);
+});
+
+test('clearing asks for confirmation, targets only the selected space, and suppresses present agents',()=>{
+  const h=harness();h.props({role:'world',overlay:'farm'});h.garden.width=880;
+  const nodes=h.nodes();has(nodes,'clear-grove').attrs.on_click[0]();
+  const spec=h.calls.at(-1)[1];assert.equal(spec.props.role,'clear-grove');assert.equal(spec.props.spaceId,'here');
+  h.props({...spec.props,overlay:'confirm'});h.garden.init(null,h.cx);
+  has(h.nodes(),'clear-confirm').attrs.on_click[0]({},h.cx);
+  let state=h.preferences.get(GROVE_KEY),here=state.spaces.find(s=>s.id==='here');
+  assert.equal(here.trees.length,0);assert.equal(here.ignored.length,5);assert.equal(state.spaces.find(s=>s.id==='other').trees.length,1);
+  h.props({role:'world'});h.garden.width=880;assert(!has(h.nodes(),'tree-a0'));
+  h.data.push({space:'here',address:'fresh',status:'working',program:{name:'Fresh'}});assert(has(h.nodes(),'tree-fresh'));
+  state=h.preferences.get(GROVE_KEY);const before=JSON.stringify(state);
+  h.spaceList[0].active=false;h.spaceList.push({id:'other',active:true,tabs:[]});
+  h.props({role:'clear-grove',spaceId:'here',overlay:'stale'});h.garden.init(null,h.cx);h.garden.clearGrove(h.cx);
+  assert(h.garden.clearError.includes('changed'));assert.equal(JSON.stringify(h.preferences.get(GROVE_KEY)),before);
 });
 
 test('sidebar scene is compact at every height and all agents remain reachable',()=>{
@@ -154,16 +223,16 @@ test('compact trees fit the landscape and their hit targets do not overlap',()=>
   }
 });
 
-test('live scene filters spaces, focuses exact agents, paginates and grows one tree per worker',()=>{
+test('live scene filters spaces, focuses exact agents, paginates and keeps trees after completion',()=>{
   const h=harness(),g=h.garden;
   let nodes=h.nodes();
   assert.deepEqual(h.order(),['a0','a1','a2','a3','a4','elsewhere']);
-  assert(!has(nodes,'farmer-elsewhere'));assert(has(nodes,'tree-a0'));assert(!has(nodes,'tree-a1'));
+  assert(!has(nodes,'farmer-elsewhere'));assert(has(nodes,'tree-a0'));assert(has(nodes,'tree-a1'));assert(!has(nodes,'tree-elsewhere'));
   assert(has(nodes,'unit-a0'));assert(!has(nodes,'unit-a3'));
   has(nodes,'unit-a1').attrs.on_click[0]({},h.cx);assert.equal(h.calls[0][0],'agent.focus');assert.equal(h.calls[0][1].terminal,'a1');
   has(nodes,'next-field').attrs.on_click[0]({},h.cx);nodes=h.nodes();assert(has(nodes,'unit-a3'));
   has(nodes,'previous-field').attrs.on_click[0]({},h.cx);
-  h.data[0].status='done';nodes=h.nodes();assert(!has(nodes,'tree-a0'));assert(nodes.includes('Finished!'));
+  h.data[0].status='done';nodes=h.nodes();assert(has(nodes,'tree-a0'));assert(nodes.includes('Finished!'));
   assert.equal(h.calls.length,1,'A status update sends no duplicate notification or sound');
   h.data[0].status='working';g.page=0;nodes=h.nodes();
   has(nodes,'visit-farm').attrs.on_click[0]({},h.cx);assert.equal(h.calls[1][0],'openOverlay');assert.equal(h.calls[1][1].props.role,'world');

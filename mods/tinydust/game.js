@@ -25,9 +25,8 @@ export function scenePage(list, requested=0, size=SCENE_PAGE_SIZE) {
   const page=Math.max(0,Math.min(pages-1,Number.isFinite(requested)?Math.floor(requested):0));
   return {page,pages,agents:list.slice(page*capacity,(page+1)*capacity)};
 }
-export function grove(list) {
-  const workers=list.filter(a=>a.status==="working");
-  return {count:workers.length,visible:workers.slice(0,TREE_LIMIT)};
+export function grove(trees) {
+  return {count:trees.length,visible:trees.slice(0,TREE_LIMIT)};
 }
 export function sceneSpot(index,status,width) {
   // Each agent has a lane; status moves it inside the lane, not over other agents.
