@@ -1,11 +1,12 @@
 import {View,div,image} from "gpui-kit";
 import {h_flex,v_flex,Button,Input,InputState} from "gpui-base";
-import {agents,spaces,panes,run,setAgentOrder,shared,setShared,props,theme,openOverlay,closeOverlay,layout,window,checking} from "herdr";
+import {agents,spaces,panes,run,setAgentOrder,shared,setShared,props,theme,openOverlay,closeOverlay,layout,window,checking,exec,appHome} from "herdr";
 import {STATES,UNKNOWN,characterFor,scenePage,grove} from "./game.js";
 import {actor,farmScene} from "./scene.js";
 import {toastView} from "./toast.js";
 import {creationTarget,creationMenu} from "./creation.js";
-import {workbench} from "./workbench.js";
+import {workbenchBar} from "./workbench.js";
+import {usageView,decodeUsage,sampleUsage} from "./usage-ui.js";
 import {spaceShortcuts,compactSpaces} from "./spaces.js";
 import {GROVE_KEY,readGroves,rememberAgents,clearGrove} from "./grove.js";
 import {PANE_LABEL_KEY,readPaneLabels,matchingPane,paneLabel,setPaneLabel} from "./labels.js";
@@ -48,6 +49,10 @@ export default class TinyDust extends View {
       if(!checking()){this.paneInput.focus();this.paneFocusTask=cx.timer.after(600,()=>this.paneInput.focus());}
     }
     this.paneHovered=false;
+    if(p.role==="usage"){
+      this.usageData=p.demo?sampleUsage():null;this.usageBusy=false;this.usageError="";this.usagePeriod="today";this.usageGeneration=0;this.usageClosed=false;
+      this.menuHandle=cx.focus_handle();this.menuHandle.focus();
+    }
     if(props()?.role==="font-menu"){
       const current=props()?.demo?null:shared("tinydust.brandFont");
       this.fontInput=InputState.new({value:typeof current==="string"?current:"",placeholder:`${DEFAULT_BRAND_FONT} (default)`});
@@ -58,6 +63,28 @@ export default class TinyDust extends View {
     this.width=props()?.role==="world"?880:300;this.height=600;this.page=0;
     this.demoMotion=false;this.demoSelected=null;this.lastFocused=null;
     this.shaken=null;this.treeTask=null;this.treeMessage="";this.treeAddress=null;
+  }
+  close() {
+    this.usageClosed=true;this.usageGeneration=(this.usageGeneration??0)+1;
+    try {this.usageTask?.cancel();} catch {}
+  }
+  scanUsage(prices,cx) {
+    if(props()?.demo||this.usageBusy||this.usageClosed)return;
+    this.usageBusy=true;this.usageError="";const generation=++this.usageGeneration;cx.notify();
+    const script=`${appHome().replace(/[\\/]+$/,"")}/mods/tinydust/usage_scan.py`;
+    // shortcut: a host exec may outlive the dialog until its bounded scan ends; cancel the process when the host exposes cancellation.
+    this.usageTask=cx.spawn(async taskCx=>{
+      try {
+        const result=await exec("python3",[script,...(prices?["--prices"]:[])],{timeout:40000});
+        if(result.code!==0)throw new Error("Scan failed");
+        const data=decodeUsage(result.stdout);
+        if(!this.usageClosed&&generation===this.usageGeneration)this.usageData=data;
+      } catch {
+        if(!this.usageClosed&&generation===this.usageGeneration)this.usageError="Could not scan usage. Check that Python 3 is available, then try again.";
+      } finally {
+        if(!this.usageClosed&&generation===this.usageGeneration){this.usageBusy=false;taskCx.notify();}
+      }
+    });
   }
   saveFont(cx) {
     const font=this.fontInput.value().trim();
@@ -150,6 +177,10 @@ export default class TinyDust extends View {
   render() {
     const p=props()??{},demo=p.demo===true,expanded=p.role==="world",t=theme();
     if(p.role==="create-menu")return creationMenu(p,t).when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle));
+    if(p.role==="usage")return usageView({data:this.usageData,busy:this.usageBusy,error:this.usageError,period:this.usagePeriod,demo},t,{
+      scan:(prices,cx)=>this.scanUsage(prices,cx),period:(period,cx)=>{this.usagePeriod=period;cx.notify();},close:()=>{if(p.overlay)closeOverlay(p.overlay);},
+    }).when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
+      .on_key_down((event,cx)=>{if(String(event.key).toLowerCase()==="escape"&&p.overlay){closeOverlay(p.overlay);cx.stop_propagation();}});
     if(p.role==="pane-menu"||(p.tab==="pane"&&p.target)){
       const available=Boolean((demo&&p.target?.pane&&p.target?.terminal)||matchingPane(panes(),p.target));
       return paneMenu(p.target,available,t,this.paneMenuIndex,(kind,cx)=>this.choosePaneMenu(kind,cx))
@@ -209,7 +240,7 @@ export default class TinyDust extends View {
     }
     const quiet=!demo&&shared("tinydust.quiet")===true;
     const motion=(demo?this.demoMotion:shared("tinydust.motion")===true)&&!quiet;
-    if(p.role==="workbench")return workbench(t,this.width).on_size_change(measure);
+    if(p.role==="workbench")return workbenchBar(t,this.width,()=>openOverlay({mod:"tinydust",kind:"dialog",width:560,height:640,props:{role:"usage",...(demo?{demo:true}:{})}})).on_size_change(measure);
     if(p.role==="brand"){
       const requested=demo?null:shared("tinydust.brandFont"),font=typeof requested==="string"&&requested.trim()?requested.trim():DEFAULT_BRAND_FONT;
       const lights=macLights(),usable=lights?Math.max(0,this.width-70):this.width,macRail=lights&&this.width<160;

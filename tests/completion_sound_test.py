@@ -117,6 +117,8 @@ class CompletionSoundTests(unittest.TestCase):
             self.assertEqual((self.home / asset).read_bytes(), (ROOT / asset).read_bytes())
         pane_license = Path('mods/tinydust/HERDR-PANE-LICENSE.txt')
         self.assertEqual((self.home / pane_license).read_bytes(), (ROOT / pane_license).read_bytes())
+        scanner = Path('mods/tinydust/usage_scan.py')
+        self.assertEqual((self.home / scanner).read_bytes(), (ROOT / scanner).read_bytes())
         self.assertEqual(self.read()['sounds'], {'enabled': False, 'done': SOUND})
         self.store({'sounds': {'done': 'leave-this.mp3'}})
         personal = self.home / 'mods/tinydust/fonts/MyFont.ttf'

@@ -1,5 +1,5 @@
 import {div,image} from "gpui-kit";
-import {h_flex} from "gpui-base";
+import {h_flex,Button} from "gpui-base";
 
 // Decorative only: pane headers and terminal hit targets remain untouched.
 export function workbench(t,width) {
@@ -10,4 +10,12 @@ export function workbench(t,width) {
       .child(div().w(4).h(4).flex_none().bg(t.working))
       .child(div().w(4).h(4).flex_none().bg(t.accent))
       .child(div().w(4).h(4).flex_none().bg(t.done)));
+}
+
+export function workbenchBar(t,width,onUsage) {
+  return h_flex().id("workbench-bar").size_full().min_w(0).gap(6).items_center()
+    .when(width>=150,e=>e.child(div().flex_1().min_w(0).h_full().child(workbench(t,Math.max(0,width-70)))))
+    .when(width<150,e=>e.child(div().flex_1()))
+    .child(Button.new("usage-open").accessibility_label("Open usage").tooltip("Open usage").h(26).px(9).flex_none().items_center().rounded(3)
+      .bg(t.raised).text_color(t.foreground).text_size(11).on_click(onUsage).child("Usage"));
 }

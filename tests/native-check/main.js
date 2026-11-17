@@ -4,7 +4,8 @@ import {farmScene} from "./scene.js";
 import {grove} from "./game.js";
 import {toastView} from "./toast.js";
 import {creationMenu} from "./creation.js";
-import {workbench} from "./workbench.js";
+import {workbench,workbenchBar} from "./workbench.js";
+import {usageView,sampleUsage} from "./usage-ui.js";
 import {spaceShortcuts,compactSpaces} from "./spaces.js";
 import {paneHeader,paneMenu} from "./pane-ui.js";
 import {theme} from "herdr";
@@ -18,6 +19,8 @@ export default class NativeCheck extends View {
       div().w(280).h(196).child(creationMenu({target:{}},theme())),
       div().w(280).h(26).child(workbench(theme(),280)),
       div().w(120).h(26).child(workbench(theme(),120)),
+      div().w(400).h(26).child(workbenchBar(theme(),400,()=>{})),
+      div().w(560).h(640).child(usageView({data:sampleUsage(),busy:false,error:"",period:"today",demo:true},theme(),{scan:()=>{},period:()=>{},close:()=>{}})),
       div().w(220).h(36).child(spaceShortcuts(theme(),true)),
       div().w(44).h(150).child(compactSpaces(theme(),true)),
       div().w(360).h(30).child(paneHeader(target,labels,theme(),true,()=>{},()=>{},samplePane)),

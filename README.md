@@ -17,6 +17,7 @@
 - **Completion you can notice.** Finished characters cheer and display a speech bubble. Herdr's existing completion toast gets a TinyDust portrait and “Harvest ready” styling; clicking it focuses that agent. Existing Herdr sounds are respected, with no second notification or extra loud sound.
 - **A gentle completion chime.** An original 1.2-second C-major melody is bundled. The installer selects it when no custom completion sound is set, preserving mute and existing custom sounds. **Herdr applies this sound globally, including other layouts.**
 - **A cozy workbench.** A tiny pixel sprout and garden-colored trim frame the terminal area; a clearer rose outline marks the focused pane. The decoration sits outside your terminal text. TinyDust's pane header retains split/zoom/close controls without changing terminal fonts or colors.
+- **Optional usage overview.** The workbench’s **Usage** button opens an independent, on-demand view of recent local Pi, Claude Code, Codex, and OpenCode usage. See token counts and recorded/estimated API value by source and model. Public-price lookup is optional; there is no Kanso dependency or automatic scanning.
 - **Name what an agent is doing.** Right-click a terminal or its header and choose **Rename pane**. The label appears on that pane and its character in the sidebar and farm; on the narrow rail, hover the portrait to read it. These are manual TinyDust-only labels—not changes to the terminal's actual name or automatic task tracking.
 - **Colorful space shortcuts.** A compact row of flower, house, tree, and star icons provides quick space switching. Their colors follow Herdr's saved space colors; the original Spaces list remains below for its menus, reordering, machines, and worktrees. Icons are assigned automatically, not picked individually.
 - **A colorful collapsible sidebar.** Click **‹** beside the space shortcuts to fold the sidebar into a slim rail; click **›** to restore its previous width. Colorful space icons and small agent portraits remain visible and clickable, along with the New menu.
@@ -50,6 +51,16 @@ To reset one space, open **Visit farm → Clear grove** and confirm. This is not
 3. To remove a label, open Rename pane again, clear the field, and save. Labels are single-line and limited to 80 characters.
 
 The right-click menu's **More Herdr actions…** opens Herdr's original pane menu, including split, zoom, close, and program-specific options. Labels belong to a particular pane and terminal pair, remain local to TinyDust, and do not automatically change when an agent starts different work. A terminal temporarily shown in someone else's pane cannot be labeled there; first give it a pane of its own. If the pane closes or its terminal changes while the dialog is open, the label is not saved to another target.
+
+### Usage and privacy
+
+Click **Usage** in the workbench, then choose **Scan offline** or **Scan + public prices**. The scanner reads recent local session files for Pi, Claude Code, Codex and OpenCode’s SQLite database, and extracts usage metadata. It does not save prompt text or session records, and the result stays in memory. Scans run only when requested; an in-flight scan may finish shortly after the dialog closes. Python 3 must be available as `python3` to Herdr.
+
+By default it looks under `~/.pi/agent/sessions`, `~/.claude/projects`, `~/.codex/sessions` and `~/.codex/archived_sessions`, and `~/.local/share/opencode`. It honors `PI_CODING_AGENT_DIR`, `CLAUDE_CONFIG_DIR`, a single-directory `CODEX_HOME`, and `XDG_DATA_HOME` when set; symlinked session files are skipped.
+
+**Scan + public prices** fetches the public [OpenRouter model catalog](https://openrouter.ai/api/v1/models); it sends no session content or model names. Offline scans make no network requests. The display uses recorded costs where available, otherwise exact model matches in the catalog; missing prices are marked **unpriced**, not treated as free. Values are estimates or provider-reported amounts—not a bill, subscription quota, or current context-window percentage.
+
+The view covers **today**, the **last 7 days**, and the **last 30 days** of session files modified within that 30-day window. A scan is bounded to 512 MiB, 25 seconds, 2,000 files, and 50,000 usage events; oversized records, errors, or limits are disclosed as partial results. Compressed Codex sessions are skipped, and Codex forked/resumed or newer record formats can be incomplete or duplicated. OpenCode support covers its local SQLite database. Model lists show the top eight; there is no project or prompt breakdown. These formats can change, so compare against your provider’s official billing for financial decisions.
 
 ### Completion and notifications
 
@@ -136,6 +147,7 @@ Install custom fonts with your operating system or put `.ttf` / `.otf` files in 
 | Label an agent's pane | Right-click the terminal, pane header, or sidebar portrait → Rename pane |
 | Open Herdr's original pane menu | Right-click a terminal → More Herdr actions… |
 | Open the larger farm | Visit farm; Escape or Back to work to leave |
+| View usage | Usage in the workbench → Scan offline, or Scan + public prices |
 | Inspect/shake a tree | Click a tree, including one whose agent has left; shaking requires Motion on |
 | Clear a space's grove | Visit farm → Clear grove → confirm; current agents will not immediately replant |
 | See more farmhands | Previous / Next under the scene |
@@ -158,7 +170,7 @@ On a narrow window, hide the journal or collapse the sidebar. The rail shows col
 
 TinyDust's two runtime mods:
 
-- Make **no network requests**, launch **no background helper programs**, install **no agent plugins**, and do not read terminal output or project files. The New menu starts shells only when explicitly selected, using Herdr's normal creation commands.
+- Do not read terminal output or project files or install agent plugins. The New menu starts shells only when explicitly selected, using Herdr's normal creation commands. The optional Usage scan launches a bounded local Python process only on request and reads AI session files; the optional pricing choice makes a public OpenRouter request without sending session contents. There is no automatic scanning or persistent usage cache.
 - Read Herdr's agent/space state to draw the farm, and existing notification payloads to style toasts. Issue normal focus/layout/overlay commands when clicked; no duplicate completion notifications are generated.
 - Store grove history in Herdr's local `shared.json` under `tinydust.groves.v1`: space IDs, agent terminal addresses, and short program names only—not conversation text, terminal output, or task titles. Pane labels are stored separately under `tinydust.paneLabels.v1` with their pane and terminal IDs; labels can contain whatever you type, so avoid secrets. Both are plaintext and local to the Herdr app home; they do not automatically sync across devices.
 - Save the journal with Herdr's per-mod-copy `localStorage`, under the `journal-v1` key. Preferences use shared keys prefixed with `tinydust.`; space shortcuts read Herdr's existing `space.colors` without changing it.
@@ -172,7 +184,7 @@ Herdr's own network, telemetry, notifications, shipped mods, and remote-machine 
 
 ## Develop
 
-No npm dependencies or build step are needed to run the layout. Node.js 22+ is used only for tests; Python 3 generates the original SVG and installs files.
+No npm dependencies or build step are needed to run the layout. Node.js 22+ is used only for tests; Python 3 generates the original SVG, installs files, and runs the optional Usage scanner.
 
 ```sh
 npm test
@@ -197,6 +209,8 @@ python3 scripts/check-native.py
 | `mods/tinydust/creation.js` | Unified creation menu with captured/stale-target checks |
 | `mods/tinydust/labels.js` | Validated local labels keyed to exact pane and terminal pairs |
 | `mods/tinydust/pane-ui.js` | TinyDust pane header and context-menu entry points |
+| `mods/tinydust/usage-ui.js` | On-demand usage dialog and validated summaries |
+| `mods/tinydust/usage_scan.py` | Independent, bounded local usage scanner and optional public pricing |
 | `mods/tinydust/spaces.js` | Colorful space shortcuts and compact rail using Herdr's existing color assignments |
 | `mods/tinydust/fonts/` | Nads Handwriting and Silkscreen, with their separate notices |
 | `mods/tinydust/workbench.js` | Decorative workbench trim; uses the original pixel sprout SVG |
@@ -224,7 +238,7 @@ The script temporarily switches layouts and substitutes sample data for private 
 
 ### Validation
 
-Thirty-two Node test cases cover pane-label storage, target validation, concurrent-edit protection, menu delegation and sidebar display, compact space/agent icons, sidebar view switching, collapse/expand, width restoration and macOS traffic-light handling, responsive logo and full-name behavior, persistent grove storage, per-space clearing and corrupt-data protection, compact-scene geometry and paging, space shortcuts and stale/demo targets, title-font settings, decorative workbench layout and pane-header controls, creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; additional fixtures check populated animated scenes, notification variants, the creation menu, pane header and menu, workbench trim, expanded/compact spaces, the brand, font menu, and grove confirmation. Creation routing is tested with host doubles; tests do not open real tabs or shells. Eight Python tests cover default/forced/opt-out sound selection, mute/custom-setting preservation, backups, invalid/symlinked/concurrently changed settings, failure cleanup, and installation of the sound, font, and license in an isolated sandbox. The installer tests also cover preserving existing font preferences and equivalent layout JSON, skipping unchanged files, and preserving an installed file when replacement fails. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. The workbench, expanded and collapsed sidebar, title font, logo, pane header, pane menu, label dialog, and sample font menu were visually inspected using sample data on Linux, not actual terminal output; collapse commands and macOS rail sizing were exercised with host doubles. Pane-menu routing, stale targets and header controls are tested with host doubles; full right-click GUI interaction, keyboard/screen-reader behavior, split-pane interaction, full app-restart persistence, end-to-end notification delivery, constrained-window visual inspection, and cross-platform testing remain outstanding.
+Thirty-five Node test cases cover on-demand usage UI, scan routing and demo isolation, pane-label storage, target validation, concurrent-edit protection, menu delegation and sidebar display, compact space/agent icons, sidebar view switching, collapse/expand, width restoration and macOS traffic-light handling, responsive logo and full-name behavior, persistent grove storage, per-space clearing and corrupt-data protection, compact-scene geometry and paging, space shortcuts and stale/demo targets, title-font settings, decorative workbench layout and pane-header controls, creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; additional fixtures check populated animated scenes, notification variants, the creation menu, pane header and menu, workbench trim, expanded/compact spaces, the brand, font menu, and grove confirmation. Creation routing is tested with host doubles; tests do not open real tabs or shells. Twenty-five Python tests cover synthetic usage fixtures, privacy, deduplication, optional pricing and scan limits, plus sound selection, settings preservation, backups, failure cleanup, and sandboxed installation. The installer tests also cover preserving existing font preferences and equivalent layout JSON, skipping unchanged files, and preserving an installed file when replacement fails. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. The workbench, expanded and collapsed sidebar, title font, logo, pane header, pane menu, label dialog, usage views, and sample font menu were visually inspected using sample data on Linux, not actual terminal output; collapse commands and macOS rail sizing were exercised with host doubles. Usage parsing is tested with synthetic fixtures and an offline local scan; optional network pricing is tested with a mock, not a live request. Pane-menu routing, stale targets and header controls are tested with host doubles; full right-click GUI interaction, keyboard/screen-reader behavior, split-pane interaction, full app-restart persistence, end-to-end notification delivery, constrained-window visual inspection, and cross-platform testing remain outstanding.
 
 ## Credits and license
 

@@ -27,20 +27,23 @@ function harness(preferences=new Map()) {
   const sidebar={id:'sidebar',size:{px:300},children:[spaceView]},rootLayout={id:'root',children:[sidebar]},windowState={platform:'linux'};
   const data=['working','blocked','done','idle','future'].map((status,i)=>({address:'a'+i,pane:i===0?'pane-here':i===1?'pane-other':`pane-${i}`,space:'here',status,program:{name:'Agent '+i},tab_name:'Work'}));
   data.push({address:'elsewhere',space:'other',status:'working'});
-  const cx={notify(){},stop_propagation(){},focus_handle:()=>({focus(){}}),timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}}};
+  let execute=async()=>{throw Error('Unexpected usage scan');};
+  const cx={notify(){},stop_propagation(){},focus_handle:()=>({focus(){}}),timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}},
+    spawn(fn){const promise=Promise.resolve().then(()=>fn(cx));return {promise,cancel(){}};}};
   const inputState={new:({value=''})=>({text:value,on(){},focus(){},value(){return this.text;},set_value(value){this.text=value;}})};
   const context={View:class{},div:element,svg:path=>element().svg(path),image:path=>element().image(path),h_flex:element,v_flex:element,Button:{new:id=>element().id(id)},Input:{new:()=>element()},InputState:inputState,
-    props:()=>properties,theme:()=>new Proxy({},{get:()=> '#aabbcc'}),shared:k=>preferences.get(k),setShared:(k,v)=>preferences.set(k,v),home:()=>'/home/sample',checking:()=>true,
+    props:()=>properties,theme:()=>new Proxy({},{get:()=> '#aabbcc'}),shared:k=>preferences.get(k),setShared:(k,v)=>preferences.set(k,v),home:()=>'/home/sample',appHome:()=>'/test/herdr home',checking:()=>true,
+    exec:(...args)=>{calls.push(['exec',...args]);return execute(...args);},
     agents:()=>data,spaces:()=>spaceList,panes:()=>paneList,layout:()=>rootLayout,window:()=>windowState,setAgentOrder:v=>order=v,run:(...args)=>calls.push(args),
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
-  for(const file of ['game.js','grove.js','labels.js','scene.js','toast.js','creation.js','workbench.js','spaces.js','pane-ui.js','main.js']){
+  for(const file of ['game.js','grove.js','labels.js','scene.js','toast.js','creation.js','workbench.js','usage-ui.js','spaces.js','pane-ui.js','main.js']){
     const source=readFileSync(new URL('../mods/tinydust/'+file,import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export (function|const) /g,'$1 ').replace('export default class TinyDust','class TinyDust');
-    vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':''),context);
+    vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':file==='usage-ui.js'?'\nthis.UsageAPI={decodeUsage,sampleUsage,usageMoney,compactTokens};':''),context);
   }
   const garden=new context.Garden();garden.init();
-  return {garden,cx,data,spaceList,paneList,sidebar,spaceView,rootLayout,windowState,preferences,calls,props:p=>{properties=p;},order:()=>Array.from(order),nodes:()=>flat(garden.render()),tick:()=>timer?.(cx)};
+  return {garden,cx,data,spaceList,paneList,sidebar,spaceView,rootLayout,windowState,preferences,calls,usage:context.UsageAPI,setExec:fn=>{execute=fn;},props:p=>{properties=p;},order:()=>Array.from(order),nodes:()=>flat(garden.render()),tick:()=>timer?.(cx)};
 }
 
 test('New menu routes tab, space and terminal to captured targets; stale targets and demos are safe',()=>{
@@ -184,8 +187,9 @@ test('workbench decoration stays outside the terminal and preserves native pane 
   const h=harness();h.props({role:'workbench'});
   let nodes=h.nodes();assert(has(nodes,'workbench-trim'));assert(nodes.includes('The workbench'));
   assert(nodes.some(n=>n.attrs?.image?.[0]==='mods/tinydust/workbench-sprout.svg'));
-  assert(!nodes.some(n=>n.attrs?.on_click));assert.equal(h.calls.length,0);
-  h.garden.width=100;nodes=h.nodes();assert(has(nodes,'workbench-trim'));assert(nodes.includes('The workbench'));
+  assert(!flat(has(nodes,'workbench-trim')).some(n=>n.attrs?.on_click));assert.equal(h.calls.length,0);
+  has(nodes,'usage-open').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].props.role,'usage');
+  h.garden.width=100;nodes=h.nodes();assert(!has(nodes,'workbench-trim'));assert(has(nodes,'usage-open'));
   const layout=JSON.parse(readFileSync(new URL('../layouts/tinydust.json',import.meta.url),'utf8'));
   const visit=node=>[node,...(node.children??[]).flatMap(visit)], all=visit(layout);
   const shell=all.find(node=>node.id==='workbench'),main=all.find(node=>node.id==='main');
@@ -194,6 +198,39 @@ test('workbench decoration stays outside the terminal and preserves native pane 
   assert.equal(layout.terminal_menu,'tinydust');assert.equal(main.content.pane.header.reveal,'always');
   assert.equal(main.content.pane.focus.color,'accent');assert.equal(main.content.pane.focus.width,2);
   assert.equal(layout.terminal_padding[0],14);assert.equal(layout.terminal_padding[1],12);
+});
+
+test('usage summaries reject malformed data and distinguish unpriced tokens',()=>{
+  const h=harness(),sample=h.usage.sampleUsage(),decoded=h.usage.decodeUsage(JSON.stringify(sample));
+  assert.equal(decoded.periods.today.tokens,18500);assert.equal(h.usage.usageMoney(decoded.periods.today),'$0.12');
+  assert.equal(h.usage.usageMoney({priced:0,usd:0}),'—');assert.equal(h.usage.usageMoney({priced:2,usd:0}),'$0.00');
+  assert.equal(h.usage.compactTokens(12000),'12.0K');
+  const invalid=JSON.parse(JSON.stringify(sample));invalid.periods.today.unpriced=1;
+  assert.throws(()=>h.usage.decodeUsage(invalid));assert.throws(()=>h.usage.decodeUsage('{broken'));
+  sample.periods.today.sources[0].checked=false;h.props({role:'usage',demo:true});h.garden.init(null,h.cx);
+  h.garden.usageData=h.usage.decodeUsage(sample);assert(h.nodes().includes('Not checked'));
+});
+
+test('usage scans only on request, prices are explicit, and demo never scans',async()=>{
+  const h=harness();h.props({role:'usage',overlay:'usage'});h.garden.init(null,h.cx);
+  let nodes=h.nodes();assert(has(nodes,'usage-offline'));assert(has(nodes,'usage-prices'));assert.equal(h.calls.length,0);
+  h.setExec(async()=>({code:0,stdout:JSON.stringify(h.usage.sampleUsage())}));
+  has(nodes,'usage-offline').attrs.on_click[0]({},h.cx);await h.garden.usageTask.promise;
+  let call=h.calls.find(c=>c[0]==='exec');assert.equal(call[1],'python3');assert.equal(call[2][0],'/test/herdr home/mods/tinydust/usage_scan.py');
+  assert(!call[2].includes('--prices'));assert.equal(call[3].timeout,40000);assert.equal(h.garden.usageData.periods.today.tokens,18500);
+  nodes=h.nodes();has(nodes,'usage-prices').attrs.on_click[0]({},h.cx);await h.garden.usageTask.promise;
+  call=h.calls.filter(c=>c[0]==='exec').at(-1);assert(call[2].includes('--prices'));assert.equal(h.preferences.size,0,'usage must not modify shared preferences');
+  h.setExec(async()=>({code:1,stderr:'PRIVATE_FILE_PATH'}));h.garden.scanUsage(false,h.cx);await h.garden.usageTask.promise;
+  assert(h.garden.usageError.includes('Could not scan'));assert(!h.garden.usageError.includes('PRIVATE_FILE_PATH'));
+  const count=h.calls.length;h.props({role:'usage',demo:true});h.garden.init(null,h.cx);nodes=h.nodes();
+  has(nodes,'usage-offline').attrs.on_click[0]({},h.cx);assert.equal(h.calls.length,count);assert(nodes.includes('Sample data only · no scan'));
+});
+
+test('closing usage ignores a late scanner result',async()=>{
+  const h=harness();h.props({role:'usage'});h.garden.init(null,h.cx);
+  let resolve;h.setExec(()=>new Promise(done=>{resolve=done;}));h.garden.scanUsage(false,h.cx);
+  const task=h.garden.usageTask;await Promise.resolve();h.garden.close();resolve({code:0,stdout:JSON.stringify(h.usage.sampleUsage())});await task.promise;
+  assert.equal(h.garden.usageData,null);
 });
 
 test('pane labels validate, remain scoped to the exact terminal, and support clearing',()=>{
