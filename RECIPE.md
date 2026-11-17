@@ -6,7 +6,7 @@ An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and anim
 
 ## What you see
 
-- A 300px left sidebar, resizable 44–480. A 46px TinyDust brand row with Journal toggle, Herdr's Spaces initially 150px tall, then Your little corner. Herdr's settings/machine footer stays below.
+- A 300px left sidebar, resizable 44–480. A 46px TinyDust brand row with + New menu and Journal toggle, Herdr's Spaces initially 150px tall, then Your little corner. Herdr's settings/machine footer stays below.
 - The corner has Motion and Visit farm controls and an exact `N working · N trees` counter. A tree-free farmhouse illustration forms the backdrop; active agents grow the visible grove. Beneath it, three lanes per row contain actual clickable characters and short nameplates, crop plots, help signs, delivery patches, and picnic blankets.
 - Up to six characters per page, or three in shorter sidebar panels. Previous/Next reaches everyone. A focused agent gets a pale ground marker; a newly focused off-page agent brings its page into view. A compact, scrollable agent list remains below. Small or Quiet sidebars omit the scene but keep this list.
 - Visit farm opens a 940×720 native dialog with the same live farm, larger sprites, Back to work, and Alert settings. The world is at most 960px wide and scrolls vertically if needed. Escape closes it. No terminal sessions or workspaces are created or closed.
@@ -15,6 +15,8 @@ An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and anim
 - Terminal `#28262b`, text `#f2e7e2`, chrome `#302c33`, accent `#e8b4c4`. Respect the user's fonts. Keep text readable; no flashing warnings or reward counters.
 
 ## How it behaves
+
+- **+ New:** one popup with New tab (`tab.new` in the captured space), New space (`space.new` on the captured machine), and New terminal (`pane.split` right of the captured pane). Capture targets before opening; recheck their existence before acting and never silently target another workspace/pane. Disable tab/split choices when their prerequisites are absent. Close the popup before executing. The button becomes + on a collapsed rail; Journal hides below 220px and the full brand name below 240px. Screenshot demo actions must not create anything.
 
 - Read only agents in the active space. Preserve model order; include other spaces after the visible list in keyboard agent navigation. Hash the terminal address with unsigned 31-based hashing modulo eight for a stable character. Reordering must not swap species; repeats are allowed.
 - **Working:** two original watering frames, tilled soil, growing shoots, falling water droplets with motion on. **Idle:** seated/rest pose on a picnic blanket, `z z z`. **Blocked:** help sign and static `Help!` bubble. **Done:** raised arms, gentle cheering motion, `Finished!` bubble. Unknown remains explicit in the list.
@@ -31,10 +33,10 @@ An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and anim
 - `layouts/tinydust.json`: root row → sidebar + work column; work body → active tab, hidden Files/Changes, journal. Root `toast: "tinydust"`.
 - `themes/tinydust.json`: ANSI and semantic panel colors.
 - `mods/tinydust/main.js`: brand/default garden/`role: "world"` dispatch, measured dimensions, page selection, tree interaction, overlay controls. Notification props (`overlay` plus `title`) dispatch to `toastView`.
-- `game.js`: pure status labels, stable character identity, pagination, working-grove count, bounded lane positions. `scene.js`: native drawing, original work/rest/cheer sprites, water, nameplates, tree clicks, optional motion. `toast.js`: notification presentation, dismissal, and original actions.
+- `creation.js`: native three-choice creation popup, current context capture, stale-target checks and explicit native commands. `game.js`: pure status labels, stable character identity, pagination, working-grove count, bounded lane positions. `scene.js`: native drawing, original work/rest/cheer sprites, water, nameplates, tree clicks, optional motion. `toast.js`: notification presentation, dismissal, and original actions.
 - `mods/tinydust-journal`: native input, textarea and buttons; validation and immutable task operations in `state.js`. Per-copy localStorage schema `{version:1, notes, tasks:[{id,text,done}], now}`.
 - Shared settings: `tinydust.motion`, `tinydust.quiet`. No new user files, journal schema changes or keyboard bindings.
-- Shipped mods referenced, not bundled: spaces, tabs, pane, files, changes, workspace-chrome, workspace-status. Use Herdr live data, normal focus/layout/overlay commands and theme colors. Runtime mods perform no network calls, subprocesses, agent-plugin installs, terminal-output reads, or project-file reads.
+- Shipped mods referenced, not bundled: spaces, tabs, pane, files, changes, workspace-chrome, workspace-status. Use Herdr live data, normal focus/layout/overlay commands and theme colors. Runtime mods perform no network calls, background helper subprocesses, agent-plugin installs, terminal-output reads, or project-file reads. Explicit New menu choices do create shells through Herdr commands.
 - `draw-art.py`: original postcard, tree-free live terrain, and tree sprite. `draw-characters.py`: eight original characters, two work frames, rest and cheer poses, plus README lineup. Both use only Python's standard library.
 
 ## Watch out
@@ -51,7 +53,7 @@ An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and anim
 ## Done when
 
 1. Both mods pass `herdr-app check`, and `python3 scripts/check-native.py` passes populated animated/static scenes and completion/generic toast variants.
-2. Nine Node tests pass: journal persistence/undo/error handling plus tree counts/caps, pagination, focus targets, character stability, pose assets, tree feedback, Quiet/motion, demo isolation and native completion-payload handling.
+2. Ten Node tests pass: creation routing/stale targets/demo isolation, journal persistence/undo/error handling plus tree counts/caps, pagination, focus targets, character stability, pose assets, tree feedback, Quiet/motion, demo isolation and native completion-payload handling.
 3. Inspect normal and sample-data layouts. Verify characters stay inside their lanes, trees stand on ground, names/bubbles remain readable and every agent is reachable.
-4. Confirm real terminals and the existing journal remain intact. Nothing sends input to an agent or starts another one.
+4. Confirm existing terminals and the journal remain intact. Nothing sends input to an agent or starts another agent. Only explicit New menu selections create shells/spaces; test fixtures must not create real sessions.
 5. Confirm the public screenshot contains only labeled sample data. Document that completion delivery and sound are owned by Herdr, not duplicated by a mod observer.

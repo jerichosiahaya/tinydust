@@ -18,7 +18,8 @@
 - **Small tasks, fewer buttons.** Expand Tasks, type a step and press Enter or Add. Use **Focus** to make it your one Now task, or the circle to complete it. Completed tasks can be reopened; the last completion can be undone.
 - **Quiet view.** Hides the landscape and next-step/completed lists, while keeping your current task, notes, and agent statuses accessible. “Show more” brings everything back.
 - **Motion off by default.** Turn it on for two-frame watering, falling droplets, gentle movement, cheering, and tree shakes. Quiet view suppresses motion; **Resume game** explicitly leaves Quiet view and enables it. No frame-polling loops, confetti, or flashing help markers.
-- **Your normal workspace.** Herdr's tabs, pane controls, files, changes, spaces, and status bar remain available. The **Journal** button hides or shows the right sidebar.
+- **One creation menu.** **+ New** in the top-left bar opens **New tab**, **New space**, and **New terminal**. A tab opens a shell in the current space; a space creates a workspace with a shell; a terminal splits a shell to the right of the current pane. Current machine/space/pane targets are preserved. Unavailable actions explain what to select first.
+- **Your normal workspace.** Herdr's tabs, pane controls, files, changes, spaces, and status bar remain available. The **Journal** button hides or shows the right sidebar. In a narrow sidebar, the creation button becomes **+**.
 
 ### Meet the crew
 
@@ -72,6 +73,9 @@ The installer backs up replaced code under `~/.config/herdr-app/backups/tinydust
 
 | Action | How |
 | --- | --- |
+| Create a tab | + New → New tab (a shell in the current space) |
+| Create a workspace | + New → New space |
+| Split a terminal | + New → New terminal (right of the current pane) |
 | Focus an agent | Click its scene character, nameplate, or list row |
 | Open the larger farm | Visit farm; Escape or Back to work to leave |
 | Inspect/shake a tree | Click a tree; shaking requires Motion on |
@@ -95,7 +99,7 @@ On a narrow window, hide the journal or collapse Herdr's sidebar. Small garden p
 
 TinyDust's two runtime mods:
 
-- Make **no network requests**, spawn **no programs**, install **no agent plugins**, and do not read terminal output or project files.
+- Make **no network requests**, launch **no background helper programs**, install **no agent plugins**, and do not read terminal output or project files. The New menu starts shells only when explicitly selected, using Herdr's normal creation commands.
 - Read Herdr's agent/space state to draw the farm, and existing notification payloads to style toasts. Issue normal focus/layout/overlay commands when clicked; no duplicate completion notifications are generated.
 - Save the journal with Herdr's per-mod-copy `localStorage`, under the `journal-v1` key. Preferences use shared keys prefixed with `tinydust.`.
 - Keep data **on this device, in plaintext**. There is no cloud sync, encryption, or automatic journal backup. Other trusted software on your device can access it. Don't use it as a secret store.
@@ -128,6 +132,7 @@ python3 scripts/check-native.py
 | `mods/tinydust/game.js` | Pure status, character, grove, pagination, and positioning rules |
 | `mods/tinydust/scene.js` | Native scene drawing, working/resting/cheering poses, interaction targets |
 | `mods/tinydust/toast.js` | Existing Herdr notifications in TinyDust style |
+| `mods/tinydust/creation.js` | Unified creation menu with captured/stale-target checks |
 | `mods/tinydust-journal/` | Notes, tasks, Quiet view, storage |
 | `scripts/draw-art.py` | Deterministic, dependency-free farm SVG source |
 | `scripts/draw-characters.py` | Eight characters, work/rest/cheer poses, and lineup |
@@ -146,7 +151,7 @@ The script temporarily switches layouts, substitutes sample data and the expande
 
 ### Validation
 
-Nine automated test cases cover journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; an additional fixture checks populated animated scenes and notification variants. Live and sample-data layouts were visually inspected on Linux. Full keyboard/screen-reader, end-to-end notification delivery, and cross-platform testing remain outstanding.
+Ten automated test cases cover creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; an additional fixture checks populated animated scenes, notification variants, and the creation menu. Creation routing is tested with host doubles; tests do not open real tabs or shells. Live and sample-data layouts were visually inspected on Linux. Full keyboard/screen-reader, end-to-end notification delivery, and cross-platform testing remain outstanding.
 
 ## Credits and license
 

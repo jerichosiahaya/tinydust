@@ -4,6 +4,7 @@ import {agents,spaces,run,setAgentOrder,shared,setShared,props,theme,openOverlay
 import {STATES,UNKNOWN,characterFor,scenePage,grove} from "./game.js";
 import {actor,farmScene} from "./scene.js";
 import {toastView} from "./toast.js";
+import {creationTarget,creationMenu} from "./creation.js";
 
 const SAMPLE=[
   {address:"sample-1",space:"sample",program:{name:"Builder"},tab_name:"Plant the first seed",status:"working"},
@@ -16,7 +17,8 @@ const button=(id,text,action)=>Button.new(id).accessibility_label(text).h(30).px
   .bg(theme().raised).text_color(theme().foreground).text_size(11).on_click(action).child(text);
 
 export default class TinyDust extends View {
-  init() {
+  init(_p,cx) {
+    if(props()?.role==="create-menu"){this.menuHandle=cx.focus_handle();this.menuHandle.focus();}
     this.width=props()?.role==="world"?880:300;this.height=600;this.page=0;
     this.demoMotion=false;this.demoSelected=null;this.lastFocused=null;
     this.shaken=null;this.treeTask=null;this.treeMessage="";
@@ -35,13 +37,19 @@ export default class TinyDust extends View {
   }
   render() {
     const p=props()??{},demo=p.demo===true,expanded=p.role==="world",t=theme();
+    if(p.role==="create-menu")return creationMenu(p,t).when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle));
     if(p.overlay&&typeof p.title==="string")return toastView(p,t);
     const quiet=!demo&&shared("tinydust.quiet")===true;
     const motion=(demo?this.demoMotion:shared("tinydust.motion")===true)&&!quiet;
     const measure=(size,cx)=>{if(size.width!==this.width||size.height!==this.height){this.width=size.width;this.height=size.height;cx.notify();}};
-    if(p.role==="brand")return h_flex().id("tinydust-brand").size_full().items_center().px(10).gap(8).on_size_change(measure)
-      .child(div().text_size(17).font_bold().text_color(t.accent).child(this.width<160?"TD":"TinyDust"))
-      .when(this.width>=160,e=>e.child(div().flex_1()).child(button("journal-toggle","Journal",()=>run("layout.toggle",{id:"journal"}))));
+    if(p.role==="brand")return h_flex().id("tinydust-brand").size_full().items_center().px(6).gap(6).on_size_change(measure)
+      .when(this.width>=160,e=>e.child(div().text_size(17).font_bold().text_color(t.accent).child(this.width<240?"TD":"TinyDust")).child(div().flex_1()))
+      .child(button("create-open",this.width>=160?"+ New":"+",()=>openOverlay({
+        mod:"tinydust",kind:"popup",width:280,height:196,
+        props:{role:"create-menu",target:demo?{}:creationTarget(),...(demo?{demo:true}:{})},
+      })).accessibility_label("New tab, space, or terminal").tooltip("New tab, space, or terminal")
+        .on_mouse_down("left",(_e,cx)=>cx.stop_propagation()))
+      .when(this.width>=220,e=>e.child(button("journal-toggle","Journal",()=>run("layout.toggle",{id:"journal"}))));
     const all=demo?SAMPLE.map(a=>({...a,focused:a.address===this.demoSelected})):agents();
     const space=demo?{id:"sample",name:"Sunrise farm"}:spaces().find(s=>s.active);
     const list=all.filter(a=>a.space===space?.id);

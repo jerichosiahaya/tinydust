@@ -19,22 +19,51 @@ const has=(nodes,id)=>nodes.find(n=>n.attrs?.id?.[0]===id);
 function harness() {
   let properties={},order=[],calls=[],timer=null;
   const preferences=new Map();
+  const spaceList=[{id:'here',active:true,machine:'remote',tabs:[{id:'tab-here'}]}];
+  const paneList=[{pane:'pane-here',tab:'tab-here',focused:true,terminal:'a0'}];
   const data=['working','blocked','done','idle','future'].map((status,i)=>({address:'a'+i,space:'here',status,program:{name:'Agent '+i},tab_name:'Work'}));
   data.push({address:'elsewhere',space:'other',status:'working'});
   const cx={notify(){},timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}}};
   const context={View:class{},div:element,image:path=>element().image(path),h_flex:element,v_flex:element,Button:{new:id=>element().id(id)},
     props:()=>properties,theme:()=>new Proxy({},{get:()=> '#aabbcc'}),shared:k=>preferences.get(k),setShared:(k,v)=>preferences.set(k,v),
-    agents:()=>data,spaces:()=>[{id:'here',active:true}],setAgentOrder:v=>order=v,run:(...args)=>calls.push(args),
+    agents:()=>data,spaces:()=>spaceList,panes:()=>paneList,setAgentOrder:v=>order=v,run:(...args)=>calls.push(args),
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
-  for(const file of ['game.js','scene.js','toast.js','main.js']){
+  for(const file of ['game.js','scene.js','toast.js','creation.js','main.js']){
     const source=readFileSync(new URL('../mods/tinydust/'+file,import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export (function|const) /g,'$1 ').replace('export default class TinyDust','class TinyDust');
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':''),context);
   }
   const garden=new context.Garden();garden.init();
-  return {garden,cx,data,preferences,calls,props:p=>{properties=p;},order:()=>Array.from(order),nodes:()=>flat(garden.render()),tick:()=>timer?.(cx)};
+  return {garden,cx,data,spaceList,paneList,preferences,calls,props:p=>{properties=p;},order:()=>Array.from(order),nodes:()=>flat(garden.render()),tick:()=>timer?.(cx)};
 }
+
+test('New menu routes tab, space and terminal to captured targets; stale targets and demos are safe',()=>{
+  const h=harness();h.props({role:'brand'});
+  has(h.nodes(),'create-open').attrs.on_click[0]();
+  const spec=h.calls[0][1];assert.equal(spec.kind,'popup');assert.equal(spec.props.role,'create-menu');
+  assert.equal(spec.props.target.space,'here');assert.equal(spec.props.target.machine,'remote');assert.equal(spec.props.target.pane,'pane-here');
+  h.props({...spec.props,overlay:'new-menu'});
+  const nodes=h.nodes();
+  for(const [kind,name,args] of [
+    ['tab','tab.new',{space:'here'}],['space','space.new',{machine:'remote'}],['terminal','pane.split',{pane:'pane-here',direction:'right'}]
+  ]){
+    const row=has(nodes,`create-${kind}`);assert.equal(row.attrs.disabled[0],false);
+    row.attrs.on_click[0]();const command=h.calls.at(-1);
+    assert.equal(command[0],name);assert.equal(JSON.stringify(command[1]),JSON.stringify(args));
+    assert.equal(h.calls.at(-2)[0],'closeOverlay');
+  }
+  h.paneList.length=0;const count=h.calls.length;
+  has(nodes,'create-terminal').attrs.on_click[0]();assert.equal(h.calls.length,count);
+  assert.equal(has(h.nodes(),'create-terminal').attrs.disabled[0],true);
+  h.spaceList.length=0;has(nodes,'create-tab').attrs.on_click[0]();assert.equal(h.calls.length,count);
+  assert.equal(has(h.nodes(),'create-space').attrs.disabled[0],false);
+  h.props({...spec.props,overlay:'sample-menu',demo:true});
+  for(const kind of ['tab','space','terminal'])has(h.nodes(),`create-${kind}`).attrs.on_click[0]();
+  assert.equal(h.calls.length,count);
+  h.props({role:'brand',demo:true});h.garden.width=44;
+  assert(has(h.nodes(),'create-open'));assert(!has(h.nodes(),'journal-toggle'));
+});
 
 test('working agents grow trees; counts stay honest and large scenes stay bounded',()=>{
   const list=Array.from({length:40},(_,i)=>({address:'a'+i,status:i<30?'working':'idle'}));
