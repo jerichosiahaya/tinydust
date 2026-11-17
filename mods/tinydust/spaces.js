@@ -4,7 +4,7 @@ import {agents,spaces,shared,run,openOverlay} from "herdr";
 
 // Match Herdr's space-avatar colors without changing its saved assignments.
 const COLORS={ansi6:"#22a99a",ansi3:"#e3814f",ansi4:"#5b8def",ansi5:"#8b7cf6",ansi2:"#3fae6a",ansi1:"#d9649a"};
-const ICONS=["flower","house","tree","star"];
+const ICONS=["carrot","turnip","eggplant","broccoli"];
 const SPACE_SAMPLE=[{id:"sample-a",name:"Sunrise farm",active:true,status:"blocked"},{id:"sample-b",name:"Garden studio",status:"idle"},{id:"sample-c",name:"Meadow notes",status:"done"}];
 const PALETTE=Object.keys(COLORS);
 const spaceHash=id=>{let hash=0;for(const char of String(id))hash=(hash*31+char.codePointAt(0))>>>0;return hash;};

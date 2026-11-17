@@ -80,11 +80,24 @@ test('space shortcuts use stable icons, preserve Herdr colors and only switch va
   assert.equal(has(nodes,'space-shortcut-other').attrs.bg[0],'#123456');
   h.preferences.set('space.colors',{here:'ansi1',other:'#123456aa'});assert.equal(has(h.nodes(),'space-shortcut-other').attrs.bg[0],'#123456aa');
   assert(has(nodes,'space-shortcut-here').attrs.accessibility_label[0].includes('Selected space'));
-  for(const name of ['flower','house','tree','star'])assert(readFileSync(new URL(`../mods/tinydust/space-${name}.svg`,import.meta.url),'utf8').includes('<svg'));
+  for(const name of ['carrot','turnip','eggplant','broccoli']){
+    const svg=readFileSync(new URL(`../mods/tinydust/space-${name}.svg`,import.meta.url),'utf8');
+    assert(svg.includes('viewBox="0 0 16 16"'));assert(svg.includes('shape-rendering="crispEdges"'));assert(!/<script|\bhref=/i.test(svg));
+  }
   has(nodes,'space-shortcut-other').attrs.on_click[0]();assert.equal(h.calls.at(-1)[0],'space.select');assert.equal(h.calls.at(-1)[1].id,'other');
   h.spaceList.pop();has(nodes,'space-shortcut-other').attrs.on_click[0]();assert.equal(h.calls.length,1);
   h.props({role:'space-shortcuts',demo:true});nodes=h.nodes();has(nodes,'space-shortcut-sample-a').attrs.on_click[0]();assert.equal(h.calls.length,1);
   assert.equal(h.preferences.get('space.colors').here,'ansi1');
+});
+
+test('vegetable icons are stable per space in the shortcut row and collapsed rail',()=>{
+  const h=harness();h.spaceList.splice(0,h.spaceList.length,...Array.from({length:24},(_,i)=>({id:`plot-${i}`,name:`Sample ${i}`,active:i===0,tabs:[]})));
+  h.data[0].space='plot-0';h.props({role:'space-shortcuts'});let nodes=h.nodes();
+  const icon=(all,id)=>flat(has(all,id)).find(n=>n.attrs?.image)?.attrs.image[0];
+  const assigned=new Map(h.spaceList.map(s=>[s.id,icon(nodes,`space-shortcut-${s.id}`)]));
+  assert.equal(new Set(assigned.values()).size,4);assert(has(nodes,'space-working-shortcut-plot-0'));
+  h.spaceList.reverse();h.props({role:'compact-spaces'});nodes=h.nodes();assert(has(nodes,'space-working-rail-plot-0'));
+  for(const [id,path] of assigned)assert.equal(icon(nodes,`space-rail-${id}`),path);
 });
 
 test('working-agent dots follow individual agents, respect motion and preserve other status markers',()=>{
