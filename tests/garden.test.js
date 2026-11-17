@@ -5,6 +5,7 @@ import {readFileSync} from 'node:fs';
 import {grove,scenePage,sceneSpot,characterFor,TREE_LIMIT} from '../mods/tinydust/game.js';
 import {GROVE_KEY,readGroves,rememberAgents,clearGrove} from '../mods/tinydust/grove.js';
 import {PANE_LABEL_KEY,readPaneLabels,matchingPane,paneLabel,setPaneLabel} from '../mods/tinydust/labels.js';
+import {FARM_STYLE_KEY,DEFAULT_FARM_STYLE,readFarmStyles,farmStyle,setFarmStyle} from '../mods/tinydust/farm-style.js';
 
 function element() {
   const target={nodes:[],attrs:{}};
@@ -38,7 +39,7 @@ function harness(preferences=new Map()) {
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
-  for(const file of ['game.js','grove.js','labels.js','scene.js','toast.js','creation.js','workbench.js','usage-ui.js','space-status.js','spaces.js','pane-ui.js','main.js']){
+  for(const file of ['game.js','grove.js','labels.js','farm-style.js','scene.js','farm-style-ui.js','noticeboard.js','toast.js','creation.js','workbench.js','usage-ui.js','space-status.js','spaces.js','pane-ui.js','main.js']){
     const source=readFileSync(new URL('../mods/tinydust/'+file,import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export (function|const) /g,'$1 ').replace('export default class TinyDust','class TinyDust');
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':file==='usage-ui.js'?'\nthis.UsageAPI={decodeUsage,sampleUsage,usageMoney,compactTokens};':''),context);
   }
@@ -242,7 +243,8 @@ test('workbench decoration stays outside the terminal and preserves native pane 
   assert(nodes.some(n=>n.attrs?.image?.[0]==='mods/tinydust/workbench-sprout.svg'));
   assert(!flat(has(nodes,'workbench-trim')).some(n=>n.attrs?.on_click));assert.equal(h.calls.length,0);
   has(nodes,'usage-open').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].props.role,'usage');
-  h.garden.width=100;nodes=h.nodes();assert(!has(nodes,'workbench-trim'));assert(has(nodes,'usage-open'));
+  has(nodes,'noticeboard-open').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].props.role,'noticeboard');
+  h.garden.width=100;nodes=h.nodes();assert(!has(nodes,'workbench-trim'));assert(has(nodes,'usage-open'));assert(has(nodes,'noticeboard-open'));assert(flat(has(nodes,'noticeboard-open')).includes('!'));
   const layout=JSON.parse(readFileSync(new URL('../layouts/tinydust.json',import.meta.url),'utf8'));
   const visit=node=>[node,...(node.children??[]).flatMap(visit)], all=visit(layout);
   const shell=all.find(node=>node.id==='workbench'),main=all.find(node=>node.id==='main');
@@ -251,6 +253,34 @@ test('workbench decoration stays outside the terminal and preserves native pane 
   assert.equal(layout.terminal_menu,'tinydust');assert.equal(main.content.pane.header.reveal,'always');
   assert.equal(main.content.pane.focus.color,'accent');assert.equal(main.content.pane.focus.width,2);
   assert.equal(layout.terminal_padding[0],14);assert.equal(layout.terminal_padding[1],12);
+});
+
+test('noticeboard shows live actionable agents across spaces and focuses exact valid targets',()=>{
+  const h=harness();h.spaceList.push({id:'other',name:'Studio',machine:'remote-box',active:false,tabs:[]});
+  h.data.push({address:'remote/t3',pane:'pane-remote',space:'other',status:'done',program:{name:'Reviewer'},tab_name:'Draft'});
+  h.preferences.set(PANE_LABEL_KEY,{version:1,labels:[{pane:'pane-other',terminal:'a1',name:'Garden plan'}]});
+  h.props({role:'noticeboard',overlay:'board'});h.garden.init(null,h.cx);
+  let nodes=h.nodes();assert(nodes.includes('Needs a hand'));assert(nodes.includes('Finished, not yet seen'));
+  assert(nodes.includes('Garden plan'));assert(nodes.includes('Studio · remote-box · Draft'));
+  assert(has(nodes,'noticeboard-agent-a1'));assert(has(nodes,'noticeboard-agent-a2'));assert(has(nodes,'noticeboard-agent-remote/t3'));
+  assert(!has(nodes,'noticeboard-agent-a0'));assert(!has(nodes,'noticeboard-agent-a3'));assert(!nodes.some(n=>n.attrs?.loop));
+  assert(has(nodes,'noticeboard-agent-a1').attrs.accessibility_label[0].includes('Needs attention'));
+  has(nodes,'noticeboard-agent-remote/t3').attrs.on_click[0]({},h.cx);
+  assert.equal(h.calls.at(-2)[0],'closeOverlay');assert.equal(h.calls.at(-1)[0],'agent.focus');assert.equal(h.calls.at(-1)[1].terminal,'remote/t3');
+  const stale=has(nodes,'noticeboard-agent-a1'),count=h.calls.length;h.data.find(a=>a.address==='a1').space='other';
+  stale.attrs.on_click[0]({},h.cx);assert.equal(h.calls.length,count);assert(h.garden.boardError.includes('moved or closed'));
+  h.data.forEach(a=>a.status='idle');nodes=h.nodes();assert(nodes.includes('Nothing needs attention or is waiting to be seen right now.'));
+  assert.equal(h.calls.length,count,'status changes do not create alerts or focus agents');
+  let stopped=false;has(nodes,'noticeboard').attrs.on_key_down[0]({key:'escape'},{stop_propagation(){stopped=true;}});assert(stopped);assert.equal(h.calls.at(-1)[0],'closeOverlay');
+});
+
+test('noticeboard preview is isolated and available from the sidebar',()=>{
+  const h=harness();h.props({role:'sidebar',demo:true});
+  has(h.nodes(),'noticeboard-sidebar').attrs.on_click[0]();const spec=h.calls.at(-1)[1];assert.equal(spec.props.role,'noticeboard');assert.equal(spec.props.demo,true);
+  h.props({...spec.props,overlay:'sample'});h.garden.init(null,h.cx);const before=JSON.stringify([...h.preferences]),calls=h.calls.length;
+  let nodes=h.nodes();assert(nodes.includes('Sample agents · no live actions'));assert(has(nodes,'noticeboard-agent-sample-2'));assert(has(nodes,'noticeboard-agent-sample-6'));
+  has(nodes,'noticeboard-agent-sample-2').attrs.on_click[0]({},h.cx);nodes=h.nodes();assert(nodes.includes('Sample selected · no agent was focused.'));
+  assert.equal(h.calls.length,calls);assert.equal(JSON.stringify([...h.preferences]),before);
 });
 
 test('usage summaries reject malformed data and distinguish unpriced tokens',()=>{
@@ -386,6 +416,89 @@ test('pane labels appear on the matching character, including the compact toolti
   assert(stopped);assert.equal(h.calls.at(-1)[1].props.target.pane,'pane-here');assert.equal(h.calls.at(-1)[1].props.target.terminal,'a0');
   h.data[0].address='another-terminal';nodes=h.nodes();assert(!has(nodes,'farmer-another-terminal').attrs.tooltip[0].includes('Build API'));
   h.props({role:'world',demo:true});h.garden.width=880;nodes=h.nodes();assert(nodes.includes('Plant the first seed'));assert(!nodes.includes('Build API'));
+});
+
+test('farm appearance is versioned, per space and never contains agent information',()=>{
+  const empty=readFarmStyles(null);assert.equal(farmStyle(empty,'here').companion,'cat');
+  const one=setFarmStyle(empty,'here','companion','rabbit'),two=setFarmStyle(one,'other','companion','chick');
+  assert.equal(empty.spaces.length,0);assert.equal(farmStyle(two,'here').companion,'rabbit');assert.equal(farmStyle(two,'other').companion,'chick');
+  assert.equal(setFarmStyle(two,'here','companion','rabbit'),two);assert.equal(farmStyle(two,'unknown').companion,'cat');
+  assert.deepEqual(Object.keys(two.spaces[0]).sort(),['companion','fence','flowers','id','pond']);
+  for(const value of ['broken',[],{version:2,spaces:[]},{version:1,spaces:null},
+    {version:1,spaces:[{id:'x',companion:'unknown',flowers:false,fence:false,pond:false}]},
+    {version:1,spaces:[{id:'x',...DEFAULT_FARM_STYLE},{id:'x',...DEFAULT_FARM_STYLE}]}])assert.throws(()=>readFarmStyles(value));
+  assert.throws(()=>setFarmStyle(two,'here','companion','__proto__'));assert.throws(()=>setFarmStyle(two,'','companion','cat'));
+  assert.throws(()=>setFarmStyle(two,'here','flowers','yes'));assert.throws(()=>setFarmStyle(two,'here','unknown',true));
+});
+
+test('companion choices save for the exact space and preserve other spaces and invalid data',()=>{
+  const h=harness();h.props({role:'world',overlay:'farm'});h.garden.width=880;
+  let nodes=h.nodes();assert(has(nodes,'companion-cat'));has(nodes,'farm-style-open').attrs.on_click[0]();
+  const spec=h.calls.at(-1)[1];assert.equal(spec.props.role,'farm-style');assert.equal(spec.props.spaceId,'here');
+  h.props({...spec.props,overlay:'style'});h.garden.init(null,h.cx);nodes=h.nodes();
+  assert(has(nodes,'farm-companion-cat').attrs.accessibility_label[0].includes('selected'));
+  has(nodes,'farm-companion-rabbit').attrs.on_click[0]({},h.cx);
+  let saved=h.preferences.get(FARM_STYLE_KEY);assert.equal(farmStyle(saved,'here').companion,'rabbit');
+  h.preferences.set(FARM_STYLE_KEY,setFarmStyle(saved,'other','companion','chick'));
+  has(h.nodes(),'farm-companion-none').attrs.on_click[0]({},h.cx);saved=h.preferences.get(FARM_STYLE_KEY);
+  assert.equal(farmStyle(saved,'here').companion,'none');assert.equal(farmStyle(saved,'other').companion,'chick');
+  h.props({role:'world'});h.garden.width=880;nodes=h.nodes();assert(!has(nodes,'companion-cat'));assert(!has(nodes,'companion-rabbit'));
+  h.props({...spec.props,overlay:'style'});h.garden.init(null,h.cx);const stale=has(h.nodes(),'farm-companion-cat');
+  h.spaceList[0].active=false;h.spaceList.push({id:'other',name:'Studio',active:true});const before=JSON.stringify(saved);
+  stale.attrs.on_click[0]({},h.cx);assert(h.garden.styleError.includes('changed'));assert.equal(JSON.stringify(h.preferences.get(FARM_STYLE_KEY)),before);
+  const corrupt={version:2,spaces:[]};h.preferences.set(FARM_STYLE_KEY,corrupt);h.props({role:'farm-style',spaceId:'other'});h.garden.init(null,h.cx);
+  nodes=h.nodes();assert.equal(has(nodes,'farm-companion-cat').attrs.disabled[0],true);h.garden.chooseFarmStyle('companion','cat',h.cx);assert.equal(h.preferences.get(FARM_STYLE_KEY),corrupt);
+});
+
+test('the companion is clickable, stays inside the landscape and respects motion and demo isolation',()=>{
+  const h=harness();h.props({role:'world',overlay:'farm'});h.garden.width=880;
+  let nodes=h.nodes(),pet=has(nodes,'companion-cat');assert(pet);assert(!pet.attrs.loop);
+  has(nodes,'companion-cat').attrs.on_click[0]({},h.cx);nodes=h.nodes();assert(nodes.includes('Hello from Pip the cat!'));assert(!has(nodes,'companion-cat').attrs.loop);
+  h.preferences.set('tinydust.motion',true);nodes=h.nodes();has(nodes,'companion-cat').attrs.on_click[0]({},h.cx);nodes=h.nodes();assert.equal(has(nodes,'companion-cat').attrs.loop[0],'top');
+  h.tick();assert(!has(h.nodes(),'companion-cat').attrs.loop);
+  h.preferences.set('tinydust.quiet',true);nodes=h.nodes();has(nodes,'companion-cat').attrs.on_click[0]({},h.cx);assert(!has(h.nodes(),'companion-cat').attrs.loop);
+  h.preferences.delete('tinydust.quiet');h.preferences.delete('tinydust.motion');h.props({role:'sidebar'});h.garden.height=1000;
+  h.data.splice(0,h.data.length,...Array.from({length:24},(_,i)=>({address:`t${i}`,space:'here',status:'idle',program:{name:'Sample'}})));
+  for(const width of [240,260,300,480]){
+    h.garden.width=width;nodes=h.nodes();pet=has(nodes,'companion-cat');const x=pet.attrs.left[0],w=pet.attrs.w[0];
+    const trees=nodes.filter(node=>node.attrs?.id?.[0]?.startsWith('tree-'));assert.equal(trees.length,24);assert(trees.every(tree=>x+w<=tree.attrs.left[0]));
+    assert(pet.attrs.top[0]+pet.attrs.h[0]<=Math.min(260,width)*0.7-5);
+  }
+  const before=JSON.stringify([...h.preferences]);h.props({role:'farm-style',spaceId:'sample',demo:true});h.garden.init(null,h.cx);
+  has(h.nodes(),'farm-companion-chick').attrs.on_click[0]({},h.cx);assert.equal(h.garden.demoFarmStyle.companion,'chick');assert.equal(JSON.stringify([...h.preferences]),before);
+  for(const kind of ['cat','rabbit','chick'])assert(readFileSync(new URL(`../mods/tinydust/companion-${kind}.svg`,import.meta.url),'utf8').includes('shape-rendering="crispEdges"'));
+});
+
+test('garden details can be toggled independently without affecting another space or the grove',()=>{
+  const h=harness();h.props({role:'world'});h.garden.width=880;let nodes=h.nodes();
+  const groveBefore=JSON.stringify(h.preferences.get(GROVE_KEY));assert(!has(nodes,'decor-flowers-0'));assert(!has(nodes,'decor-fence'));assert(!has(nodes,'decor-pond'));
+  h.props({role:'farm-style',spaceId:'here',overlay:'style'});h.garden.init(null,h.cx);
+  for(const key of ['flowers','fence','pond']){
+    nodes=h.nodes();const button=has(nodes,`farm-decor-${key}`);assert(button.attrs.accessibility_label[0].endsWith('off'));
+    button.attrs.on_click[0]({},h.cx);assert(has(h.nodes(),`farm-decor-${key}`).attrs.accessibility_label[0].endsWith('on'));
+  }
+  let state=h.preferences.get(FARM_STYLE_KEY);assert.equal(farmStyle(state,'here').companion,'cat');
+  assert.equal(farmStyle(state,'here').flowers,true);assert.equal(farmStyle(state,'here').fence,true);assert.equal(farmStyle(state,'here').pond,true);
+  h.preferences.set(FARM_STYLE_KEY,setFarmStyle(state,'other','fence',true));
+  has(h.nodes(),'farm-decor-fence').attrs.on_click[0]({},h.cx);state=h.preferences.get(FARM_STYLE_KEY);
+  assert.equal(farmStyle(state,'here').fence,false);assert.equal(farmStyle(state,'other').fence,true);
+  h.props({role:'world'});h.garden.width=880;nodes=h.nodes();assert(has(nodes,'decor-flowers-0'));assert(has(nodes,'decor-flowers-1'));assert(!has(nodes,'decor-fence'));assert(has(nodes,'decor-pond'));
+  assert.equal(JSON.stringify(h.preferences.get(GROVE_KEY)),groveBefore);assert(!has(nodes,'decor-pond').attrs.on_click);
+  const h2=harness(h.preferences);h2.props({role:'world'});h2.garden.width=880;assert(has(h2.nodes(),'decor-flowers-0'));assert(has(h2.nodes(),'decor-pond'));
+  h2.spaceList[0].active=false;h2.spaceList.push({id:'other',name:'Other',active:true});nodes=h2.nodes();assert(has(nodes,'decor-fence'));assert(!has(nodes,'decor-pond'));
+  for(const kind of ['flowers','garland','lily'])assert(readFileSync(new URL(`../mods/tinydust/decor-${kind}.svg`,import.meta.url),'utf8').includes('shape-rendering="crispEdges"'));
+});
+
+test('farm choices preserve corrupt storage and never write sample or failed changes',()=>{
+  const h=harness();const corrupt={version:2,spaces:[]};h.preferences.set(FARM_STYLE_KEY,corrupt);
+  h.props({role:'world'});h.garden.width=880;assert(h.nodes().includes('Saved farm choices could not be read; the original data was not changed.'));
+  h.props({role:'farm-style',spaceId:'here'});h.garden.init(null,h.cx);assert.equal(has(h.nodes(),'farm-decor-flowers').attrs.disabled[0],true);
+  h.garden.chooseFarmStyle('flowers',true,h.cx);assert.equal(h.preferences.get(FARM_STYLE_KEY),corrupt);
+  const failing=harness();failing.props({role:'farm-style',spaceId:'here'});failing.garden.init(null,failing.cx);
+  failing.preferences.set=()=>{throw Error('offline');};has(failing.nodes(),'farm-decor-flowers').attrs.on_click[0]({},failing.cx);
+  assert(failing.garden.styleError.includes('Could not save'));assert(!failing.preferences.has(FARM_STYLE_KEY));
+  const demo=harness();demo.props({role:'farm-style',spaceId:'sample',demo:true});demo.garden.init(null,demo.cx);
+  has(demo.nodes(),'farm-decor-flowers').attrs.on_click[0]({},demo.cx);assert.equal(demo.garden.demoFarmStyle.flowers,false);assert(!demo.preferences.has(FARM_STYLE_KEY));
 });
 
 test('persistent grove counts stay honest and large scenes stay bounded',()=>{

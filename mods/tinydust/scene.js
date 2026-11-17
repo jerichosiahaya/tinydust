@@ -1,6 +1,7 @@
 import {div,image} from "gpui-kit";
 import {Button} from "gpui-base";
 import {characterFor,STATES,UNKNOWN,sceneSpot} from "./game.js";
+import {COMPANIONS} from "./farm-style.js";
 
 const r=(x,y,w,h,c)=>div().absolute().left(x).top(y).w(w).h(h).bg(c);
 
@@ -17,7 +18,7 @@ export function actor(address,status,motion,size=54) {
 }
 
 // One visible plot per character. Native motion only; no frame-polling timer.
-export function farmScene(land,shown,{width,motion,dancing=false,expanded=false,shaken=null,onTree,onAgent}) {
+export function farmScene(land,shown,{width,motion,dancing=false,expanded=false,shaken=null,onTree,onAgent,style=null,waving=null,onCompanion=()=>{}}) {
   const sceneWidth=Math.max(240,expanded?Math.min(width,960):width);
   const artWidth=expanded?Math.min(420,sceneWidth*0.5):Math.min(260,sceneWidth), top=artWidth*0.7;
   const rows=Math.max(1,Math.ceil(shown.length/3));
@@ -28,6 +29,15 @@ export function farmScene(land,shown,{width,motion,dancing=false,expanded=false,
   const cols=expanded?8:6;
   const treeW=Math.min(expanded?48:25,orchardW/cols);
   const treeStep=expanded?treeW*1.15:Math.max(28,treeW*1.25);
+  const companion=style?.companion,petSize=expanded?42:28,petX=artWidth*0.36,petY=top*0.70;
+  let pet=null;
+  if(companion&&companion!=="none"&&Object.hasOwn(COMPANIONS,companion)){
+    pet=Button.new(`companion-${companion}`).accessibility_label(`${COMPANIONS[companion]}, say hello`)
+      .tooltip(`${COMPANIONS[companion]} · say hello`).absolute().left(petX).top(petY).w(petSize).h(petSize*20/24)
+      .on_click((_e,cx)=>onCompanion(companion,cx))
+      .child(image(`mods/tinydust/companion-${companion}.svg`).w(petSize).h(petSize*20/24));
+    if(motion&&waving===companion)pet=pet.loop("top",{from:petY,to:petY-4,period:380,easing:"ease-in-out"});
+  }
   const trees=land.visible.map((a,i)=>{
     const x=orchardX+(i%cols)*(orchardW/cols),y=(expanded?top*38/112+15:Math.max(0,top-treeStep*4))+Math.floor(i/cols)*treeStep;
     let art=image("mods/tinydust/tree.svg").w(treeW).h(treeW*1.25);
@@ -48,7 +58,14 @@ export function farmScene(land,shown,{width,motion,dancing=false,expanded=false,
       r(artWidth+300,top*32/112,180,top*6/112,"#9caea4"),
       div().absolute().left(orchardX).top(top*38/112-4).text_size(11).text_color("#2b3d32").font_semibold().child("Your grove"),
     ]))
+    .when(style?.flowers,e=>e.children([0.025,0.39].map((x,i)=>image("mods/tinydust/decor-flowers.svg").id(`decor-flowers-${i}`)
+      .absolute().left(artWidth*x).top(top*(i?0.88:0.80)).w(artWidth*0.125).h(artWidth*0.05))))
+    .when(style?.fence,e=>e.child(image("mods/tinydust/decor-garland.svg").id("decor-fence")
+      .absolute().left(artWidth*67/160).top(top*58/112).w(artWidth*27/160).h(artWidth*27/160/4)))
+    .when(style?.pond,e=>e.child(image("mods/tinydust/decor-lily.svg").id("decor-pond")
+      .absolute().left(artWidth*0.76).top(top*80/112).w(artWidth*0.09).h(artWidth*0.09*9/16)))
     .children(trees)
+    .when(Boolean(pet),e=>e.child(pet))
     .child(r(0,top-5,sceneWidth,9,"#c3ad88"))
     .children(shown.flatMap((a,index)=>{
       const state=STATES[a.status]??UNKNOWN,name=a.displayName||a.program?.name||"Agent";

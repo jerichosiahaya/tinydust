@@ -2,7 +2,7 @@
 
 **A little room to focus.** A cozy, 8-bit-inspired [Herdr](https://herdr.dev) layout: agents in the garden, one next step, and somewhere to park a thought.
 
-![TinyDust in Herdr: an interactive pixel farm in the sidebar, an expanded sample farm with working and resting characters in the center, and a simple Now-and-notes journal on the right.](preview.png)
+![TinyDust in Herdr: an interactive pixel farm with a small cat and decorations, sample farmhands, and a simple Now-and-notes journal.](preview.png)
 
 *Captured in Herdr with labeled sample agents, tasks, and workspace, using the bundled default font. The center demonstrates the expanded farm; normally your terminals live there and “Visit farm” opens the larger scene in a dialog. No personal notes, conversations, or project names are included.*
 
@@ -14,6 +14,9 @@
 - **Eight little characters.** A cat, rabbit, fox, bear, frog, duck, farmer, and gardener. Each agent gets a stable character based on its terminal address—not its position in the list. Click the portrait to focus that agent. Working, needs-you, done, and idle are written out, not just color-coded.
 - **A little working world.** Characters water crop plots, rest on picnic blankets, wait at a help sign, or throw their arms up with **“Finished!”**. Click a character or its nameplate to focus the real agent. **Visit farm** opens a larger interactive scene; Escape or Back to work closes it. For a little celebration, press **Dance!** to make the farmhands sway and hop; press **Stop dancing** when they're done.
 - **A grove that stays.** Each distinct agent terminal TinyDust sees in a space plants one tree there. Trees remain when agents finish or disappear; tap one to see which agent planted it. This is a memory of observed agents, not a count of tasks, context tokens, or productivity.
+- **A little companion.** Pip the cat, Dot the rabbit, or Pippin the chick can hang out by the cottage. Click for a hello; with Motion on, they give a little hop. Pick a different friend or none for each space.
+- **Make the farm yours.** Add flower patches, fence bunting, and pond lilies from **Visit farm → Make it yours**. Every decoration is available immediately, with no points or unlocks.
+- **Farm noticeboard.** Open **Board** to see agents needing a hand or finished while unseen across spaces. Choose an entry to focus that exact agent. No new alerts, sounds, or persistent activity history.
 - **Completion you can notice.** Finished characters cheer and display a speech bubble. Herdr's existing completion toast gets a TinyDust portrait and “Harvest ready” styling; clicking it focuses that agent. Existing Herdr sounds are respected, with no second notification or extra loud sound.
 - **A gentle completion chime.** An original 1.2-second C-major melody is bundled. The installer selects it when no custom completion sound is set, preserving mute and existing custom sounds. **Herdr applies this sound globally, including other layouts.**
 - **A cozy workbench.** A tiny pixel sprout and garden-colored trim frame the terminal area; a clearer rose outline marks the focused pane. The decoration sits outside your terminal text. TinyDust's pane header retains split/zoom/close controls without changing terminal fonts or colors.
@@ -37,6 +40,16 @@
 **Miso** the cat · **Clover** the rabbit · **Maple** the fox · **Cocoa** the bear · **Fern** the frog · **Sunny** the duck · **Rowan** the farmer · **Sage** the gardener.
 
 Character names appear in portrait tooltips. They're visual companions, not extra agents. Different terminals may share a character; the cast does not impose an agent limit. The compact sidebar farm shows three characters per page, and the larger Visit farm shows six; Previous/Next reaches the rest. Up to 24 trees are drawn, with the exact total and visible count stated when that limit is reached.
+
+### A friend and a few decorations
+
+Open **Visit farm → Make it yours**. Each space starts with Pip the cat; you can choose Dot the rabbit, Pippin the chick, or **No companion**. Click your friend in the scene for a hello. The hop is enabled only when Motion is on and Quiet view is off; the greeting works without motion or sound.
+
+Flower patches, fence bunting, and pond lily pads start off and can be switched on independently. Choices are saved for the current space, and other spaces and grove trees are unchanged. The README preview shows all three decorations using sample choices.
+
+### Farm noticeboard
+
+Click **Board** in the workbench or garden sidebar. The board groups live agents from all available spaces into **Needs a hand** and **Finished, not yet seen**; working and idle agents are not listed. Click a row to visit that agent. Herdr changes finished to idle once the agent is seen; this is not a general unread-message indicator. The board keeps no history and adds no notification or sound. When the workbench is very narrow, its Board control becomes **!**; below 80px it is hidden.
 
 ### Your persistent grove
 
@@ -147,6 +160,9 @@ Install custom fonts with your operating system or put `.ttf` / `.otf` files in 
 | Create a workspace | + New → New space |
 | Split a terminal | + New → New terminal (right of the current pane) |
 | Focus an agent | Click its scene character, nameplate, or list row |
+| Check agents across spaces | Board in the workbench or expanded garden sidebar; click an entry to visit |
+| Choose a companion or decorations | Visit farm → Make it yours; choose a friend and toggle garden details |
+| Say hello to the companion | Click the companion in the farm; hopping requires Motion on |
 | Label an agent's pane | Right-click the terminal, pane header, or sidebar portrait → Rename pane |
 | Open Herdr's original pane menu | Right-click a terminal → More Herdr actions… |
 | Open the larger farm | Visit farm; Escape or Back to work to leave |
@@ -175,12 +191,12 @@ On a narrow window, hide the journal or collapse the sidebar. The rail shows col
 TinyDust's runtime mods:
 
 - Do not read terminal output or source files or install agent plugins. The adapted Spaces list, like Herdr's original, reads Git metadata, watches repository metadata, and queries Herdr's machine list. The New menu starts shells only when explicitly selected, using Herdr's normal creation commands. The optional Usage scan launches a bounded local Python process only on request and reads AI session files; the optional pricing choice makes a public OpenRouter request without sending session contents. There is no automatic scanning or persistent usage cache.
-- Read Herdr's agent/space state to draw the farm, and existing notification payloads to style toasts. Issue normal focus/layout/overlay commands when clicked; no duplicate completion notifications are generated.
+- Read Herdr's agent/space state to draw the farm and noticeboard, and existing notification payloads to style toasts. The board is live, keeps no separate activity history, and does not scan terminal contents. Issue normal focus/layout/overlay commands when clicked; no duplicate completion notifications are generated.
 - Store grove history in Herdr's local `shared.json` under `tinydust.groves.v1`: space IDs, agent terminal addresses, and short program names only—not conversation text, terminal output, or task titles. Pane labels are stored separately under `tinydust.paneLabels.v1` with their pane and terminal IDs; labels can contain whatever you type, so avoid secrets. Both are plaintext and local to the Herdr app home; they do not automatically sync across devices.
-- Save the journal with Herdr's per-mod-copy `localStorage`, under the `journal-v1` key. Preferences use shared keys prefixed with `tinydust.`; space shortcuts read Herdr's existing `space.colors` without changing it.
+- Save per-space companion and decoration choices under `tinydust.farmStyle.v1` in `shared.json`: space IDs and appearance choices only. Invalid or newer-version appearance data is not overwritten. The journal uses Herdr's per-mod-copy `localStorage`, under `journal-v1`. Preferences use shared keys prefixed with `tinydust.`; space shortcuts read Herdr's existing `space.colors` without changing it.
 - Keep data **on this device, in plaintext**. There is no cloud sync, encryption, or automatic journal backup. Other trusted software on your device can access it. Don't use it as a secret store.
 
-Back up your Herdr config's `data/` directory and `shared.json` **privately** while Herdr is closed before removing/reinstalling a mod or migrating machines. The journal is in `data/`; grove history and pane labels are in `shared.json`. Don't commit either to Git. Herdr saves shared state asynchronously and does not report disk-write failures to mods; keep backups. Multiple independent app instances using one home have last-write-wins behavior. A cloned layout or a second journal mod instance may have its own storage; TinyDust is not a multi-window collaborative notebook.
+Back up your Herdr config's `data/` directory and `shared.json` **privately** while Herdr is closed before removing/reinstalling a mod or migrating machines. The journal is in `data/`; grove history, pane labels, and farm choices are in `shared.json`. Don't commit either to Git. Herdr saves shared state asynchronously and does not report disk-write failures to mods; keep backups. Multiple independent app instances using one home have last-write-wins behavior. A cloned layout or a second journal mod instance may have its own storage; TinyDust is not a multi-window collaborative notebook.
 
 If stored data is malformed, TinyDust shows an error and refuses to replace it. If saving fails, the journal reports it—keep the panel open and copy the notes somewhere safe. This first version has a 500-task limit, a 240-character task-title limit, and no delete/edit/export UI; completed tasks can be reopened.
 
@@ -195,6 +211,7 @@ npm test
 python3 -m unittest discover -s tests -p '*_test.py' -v
 python3 scripts/draw-art.py
 python3 scripts/draw-characters.py
+python3 scripts/draw-farm-details.py
 python3 scripts/install.py --update
 herdr-app check ~/.config/herdr-app/mods/tinydust
 herdr-app check ~/.config/herdr-app/mods/tinydust-journal
@@ -209,6 +226,8 @@ python3 scripts/check-native.py
 | `mods/tinydust/` | Brand, interactive farm, character poses, and notification skin |
 | `mods/tinydust/game.js` | Pure status, character, grove display, pagination, and positioning rules |
 | `mods/tinydust/grove.js` | Validated per-space grove history and reset rules |
+| `mods/tinydust/noticeboard.js` | Live, cross-space agent noticeboard |
+| `mods/tinydust/farm-style.js` / `farm-style-ui.js` | Validated per-space companion and decoration choices |
 | `mods/tinydust/scene.js` | Native scene drawing, working/resting/cheering poses, interaction targets |
 | `mods/tinydust/toast.js` | Existing Herdr notifications in TinyDust style |
 | `mods/tinydust/creation.js` | Unified creation menu with captured/stale-target checks |
@@ -225,6 +244,7 @@ python3 scripts/check-native.py
 | `mods/tinydust-journal/` | Notes, tasks, Quiet view, storage |
 | `scripts/draw-art.py` | Deterministic, dependency-free farm SVG source |
 | `scripts/draw-characters.py` | Eight characters, work/rest/cheer poses, and lineup |
+| `scripts/draw-farm-details.py` | Original companion and garden-detail sprites |
 | `scripts/check-native.py` | Populated, animated scene and toast checks in Herdr |
 | `scripts/make-chime.py` | Original synthesized chime source; rebuilding requires ffmpeg |
 | `scripts/completion_sound.py` | Default sound policy and backed-up settings update |
@@ -246,7 +266,7 @@ The script temporarily switches layouts and substitutes sample data for private 
 
 ### Validation
 
-Forty-six Node test cases cover compact shortcuts, themed-symbol contrast, the named space list, distinct simultaneous status symbols and motion preferences, stable pixel vegetable icons, the opt-in farm dance and Quiet view, on-demand usage UI, scan routing and demo isolation, pane-label storage, target validation, concurrent-edit protection, menu delegation and sidebar display, compact space/agent icons, sidebar view switching, collapse/expand, width restoration and macOS traffic-light handling, responsive logo and full-name behavior, persistent grove storage, per-space clearing and corrupt-data protection, compact-scene geometry and paging, space shortcuts and stale/demo targets, title-font settings, decorative workbench layout and pane-header controls, creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. All three mods pass Herdr's native check; additional fixtures check populated animated scenes, notification variants, the creation menu, pane header and menu, workbench trim, expanded/compact spaces, the brand, font menu, and grove confirmation. Creation routing is tested with host doubles; tests do not open real tabs or shells. Thirty-three Python tests cover synthetic usage fixtures, privacy, deduplication, optional pricing and scan limits, plus sound selection, Spaces-state migration, settings preservation, backups, failure cleanup, and sandboxed installation. The installer tests also cover preserving existing font preferences and equivalent layout JSON, skipping unchanged files, and preserving an installed file when replacement fails. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. The workbench, expanded and collapsed sidebar, title font, logo, pane header, pane menu, label dialog, usage views, and sample font menu were visually inspected using sample data on Linux, not actual terminal output; collapse commands and macOS rail sizing were exercised with host doubles. Sample dance and space-symbol views were inspected in Herdr; the dance button, character clicks, and named-list controls were tested with host doubles, not a GUI driver. Usage parsing is tested with synthetic fixtures and an offline local scan; optional network pricing is tested with a mock, not a live request. Pane-menu routing, stale targets and header controls are tested with host doubles; full right-click GUI interaction, keyboard/screen-reader behavior, split-pane interaction, full app-restart persistence, end-to-end notification delivery, constrained-window visual inspection, and cross-platform testing remain outstanding.
+Fifty-three Node test cases cover the cross-space noticeboard, per-space farm choices, companion motion and demo safety, compact shortcuts, themed-symbol contrast, the named space list, distinct simultaneous status symbols and motion preferences, stable pixel vegetable icons, the opt-in farm dance and Quiet view, on-demand usage UI, scan routing and demo isolation, pane-label storage, target validation, concurrent-edit protection, menu delegation and sidebar display, compact space/agent icons, sidebar view switching, collapse/expand, width restoration and macOS traffic-light handling, responsive logo and full-name behavior, persistent grove storage, per-space clearing and corrupt-data protection, compact-scene geometry and paging, space shortcuts and stale/demo targets, title-font settings, decorative workbench layout and pane-header controls, creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. All three mods pass Herdr's native check; additional fixtures check populated animated scenes, notification variants, the creation menu, pane header and menu, workbench trim, expanded/compact spaces, the brand, font menu, and grove confirmation. Creation routing is tested with host doubles; tests do not open real tabs or shells. Thirty-three Python tests cover synthetic usage fixtures, privacy, deduplication, optional pricing and scan limits, plus sound selection, Spaces-state migration, settings preservation, backups, failure cleanup, and sandboxed installation. The installer tests also cover preserving existing font preferences and equivalent layout JSON, skipping unchanged files, and preserving an installed file when replacement fails. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. The workbench, expanded and collapsed sidebar, title font, logo, pane header, pane menu, label dialog, usage views, and sample font menu were visually inspected using sample data on Linux, not actual terminal output; collapse commands and macOS rail sizing were exercised with host doubles. Sample dance, space-symbol, noticeboard, companion and decoration views were inspected in Herdr, including nested sample dialogs; interactive board, appearance, dance, character and named-list actions were tested with host doubles, not a GUI driver. Usage parsing is tested with synthetic fixtures and an offline local scan; optional network pricing is tested with a mock, not a live request. Pane-menu routing, stale targets and header controls are tested with host doubles; full right-click GUI interaction, keyboard/screen-reader behavior, split-pane interaction, full app-restart persistence, end-to-end notification delivery, constrained-window visual inspection, and cross-platform testing remain outstanding.
 
 ## Credits and license
 

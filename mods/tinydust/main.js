@@ -11,6 +11,9 @@ import {spaceShortcuts,compactSpaces} from "./spaces.js";
 import {GROVE_KEY,readGroves,rememberAgents,clearGrove} from "./grove.js";
 import {PANE_LABEL_KEY,readPaneLabels,matchingPane,paneLabel,setPaneLabel} from "./labels.js";
 import {paneHeader,paneMenu} from "./pane-ui.js";
+import {noticeboardView} from "./noticeboard.js";
+import {FARM_STYLE_KEY,COMPANIONS,DEFAULT_FARM_STYLE,readFarmStyles,farmStyle,setFarmStyle} from "./farm-style.js";
+import {farmStyleView} from "./farm-style-ui.js";
 
 const SAMPLE=[
   {address:"sample-1",pane:"sample-pane-1",space:"sample",program:{name:"Builder"},tab_name:"Plant the first seed",status:"working"},
@@ -20,6 +23,9 @@ const SAMPLE=[
   {address:"sample-5",pane:"sample-pane-5",space:"sample",program:{name:"Helper"},tab_name:"Looking after seedlings",status:"working"},
 ];
 const SAMPLE_PANE_LABELS={version:1,labels:SAMPLE.map(a=>({pane:a.pane,terminal:a.address,name:a.tab_name}))};
+const SAMPLE_BOARD=[...SAMPLE,{address:"sample-6",pane:"sample-pane-6",space:"sample-other",program:{name:"Helper"},tab_name:"Plan the garden",status:"done"}];
+const SAMPLE_SPACES=[{id:"sample",name:"Sunrise farm"},{id:"sample-other",name:"Meadow notes"}];
+const SAMPLE_FARM_STYLE={...DEFAULT_FARM_STYLE,flowers:true,fence:true,pond:true};
 const findNode=(node,id)=>node?.id===id?node:(node?.children??[]).map(child=>findNode(child,id)).find(Boolean);
 const DEFAULT_BRAND_FONT="Nads Handwriting";
 const button=(id,text,action)=>Button.new(id).accessibility_label(text).h(30).px(9).items_center().rounded(3)
@@ -53,6 +59,12 @@ export default class TinyDust extends View {
       this.usageData=p.demo?sampleUsage():null;this.usageBusy=false;this.usageError="";this.usagePeriod="today";this.usageGeneration=0;this.usageClosed=false;
       this.menuHandle=cx.focus_handle();this.menuHandle.focus();
     }
+    if(p.role==="noticeboard"){
+      this.boardError="";this.boardSelected=null;this.menuHandle=cx.focus_handle();this.menuHandle.focus();
+    }
+    if(p.role==="farm-style"){
+      this.styleError="";this.demoFarmStyle={...SAMPLE_FARM_STYLE};this.menuHandle=cx.focus_handle();this.menuHandle.focus();
+    }
     if(props()?.role==="font-menu"){
       const current=props()?.demo?null:shared("tinydust.brandFont");
       this.fontInput=InputState.new({value:typeof current==="string"?current:"",placeholder:`${DEFAULT_BRAND_FONT} (default)`});
@@ -64,10 +76,11 @@ export default class TinyDust extends View {
     this.demoMotion=false;this.demoSelected=null;this.lastFocused=null;
     this.dancing=false;this.danceSpace=null;
     this.shaken=null;this.treeTask=null;this.treeMessage="";this.treeAddress=null;
+    this.waving=null;this.waveSpace=null;this.companionTask=null;
   }
   close() {
     this.usageClosed=true;this.usageGeneration=(this.usageGeneration??0)+1;
-    try {this.usageTask?.cancel();} catch {}
+    for(const task of [this.usageTask,this.treeTask,this.companionTask])try {task?.cancel();} catch {}
   }
   scanUsage(prices,cx) {
     if(props()?.demo||this.usageBusy||this.usageClosed)return;
@@ -92,6 +105,31 @@ export default class TinyDust extends View {
     if(font.length>100||/[\x00-\x1f\x7f]/.test(font)){this.fontError="Use a font family name of at most 100 characters.";cx.notify();return;}
     if(!props()?.demo)setShared("tinydust.brandFont",font||null);
     if(props()?.overlay)closeOverlay(props().overlay);
+  }
+  openNoticeboard(demo) {
+    openOverlay({mod:"tinydust",kind:"dialog",width:520,height:560,props:{role:"noticeboard",...(demo?{demo:true}:{})}});
+  }
+  focusNotice(a,cx) {
+    const p=props()??{};
+    if(p.demo){this.boardSelected=a.address;cx.notify();return;}
+    if(!agents().some(agent=>agent.address===a.address&&agent.space===a.space)){
+      this.boardError="That agent moved or closed. The noticeboard has refreshed.";cx.notify();return;
+    }
+    if(p.overlay)closeOverlay(p.overlay);
+    run("agent.focus",{terminal:a.address});
+  }
+  chooseFarmStyle(key,value,cx) {
+    const p=props()??{};
+    if(p.demo){this.demoFarmStyle={...this.demoFarmStyle,[key]:value};cx.notify();return;}
+    if(!p.spaceId||spaces().find(space=>space.active)?.id!==p.spaceId){
+      this.styleError="The selected space changed. Nothing was saved.";cx.notify();return;
+    }
+    try {
+      const saved=readFarmStyles(shared(FARM_STYLE_KEY)),next=setFarmStyle(saved,p.spaceId,key,value);
+      if(next!==saved)setShared(FARM_STYLE_KEY,next);
+      this.styleError="";
+    } catch {this.styleError="Could not save farm choices. The original data was not intentionally replaced.";}
+    cx.notify();
   }
   openPaneMenu(target) {
     if(props()?.demo||!matchingPane(panes(),target))return;
@@ -175,9 +213,33 @@ export default class TinyDust extends View {
     if(motion)this.treeTask=cx.timer.after(1000,cx=>{this.shaken=null;this.treeTask=null;cx.notify();});
     cx.notify();
   }
+  touchCompanion(kind,cx,motion,spaceId) {
+    this.treeTask?.cancel();this.treeTask=null;this.shaken=null;this.treeAddress=null;
+    this.treeMessage=`Hello from ${COMPANIONS[kind]}!`;
+    this.companionTask?.cancel();this.waving=motion?kind:null;this.waveSpace=motion?spaceId:null;
+    if(motion)this.companionTask=cx.timer.after(1000,cx=>{this.waving=null;this.waveSpace=null;this.companionTask=null;cx.notify();});
+    cx.notify();
+  }
   render() {
     const p=props()??{},demo=p.demo===true,expanded=p.role==="world",t=theme();
     if(p.role==="create-menu")return creationMenu(p,t).when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle));
+    if(p.role==="noticeboard"){
+      let labels;try {labels=demo?SAMPLE_PANE_LABELS:readPaneLabels(shared(PANE_LABEL_KEY));}catch {labels=readPaneLabels(null);}
+      return noticeboardView(demo?SAMPLE_BOARD:agents(),demo?SAMPLE_SPACES:spaces(),labels,t,{
+        focus:(a,cx)=>this.focusNotice(a,cx),close:()=>{if(p.overlay)closeOverlay(p.overlay);},error:this.boardError,demo,selected:this.boardSelected,
+      }).when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
+        .on_key_down((event,cx)=>{if(String(event.key).toLowerCase()==="escape"&&p.overlay){closeOverlay(p.overlay);cx.stop_propagation();}});
+    }
+    if(p.role==="farm-style"){
+      let style=DEFAULT_FARM_STYLE,invalid=false;
+      try {style=demo?this.demoFarmStyle:farmStyle(readFarmStyles(shared(FARM_STYLE_KEY)),p.spaceId);}
+      catch {invalid=true;}
+      const stale=!demo&&(!p.spaceId||spaces().find(space=>space.active)?.id!==p.spaceId);
+      const error=invalid?"Saved farm choices could not be read; the original data was not changed.":stale?"The selected space changed. Close and reopen this panel.":this.styleError;
+      return farmStyleView(style,t,{choose:(key,value,cx)=>this.chooseFarmStyle(key,value,cx),close:()=>{if(p.overlay)closeOverlay(p.overlay);},error,locked:invalid||stale,demo})
+        .when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
+        .on_key_down((event,cx)=>{if(String(event.key).toLowerCase()==="escape"&&p.overlay){closeOverlay(p.overlay);cx.stop_propagation();}});
+    }
     if(p.role==="usage")return usageView({data:this.usageData,busy:this.usageBusy,error:this.usageError,period:this.usagePeriod,demo},t,{
       scan:(prices,cx)=>this.scanUsage(prices,cx),period:(period,cx)=>{this.usagePeriod=period;cx.notify();},close:()=>{if(p.overlay)closeOverlay(p.overlay);},
     }).when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
@@ -241,7 +303,7 @@ export default class TinyDust extends View {
     }
     const quiet=!demo&&shared("tinydust.quiet")===true;
     const motion=(demo?this.demoMotion:shared("tinydust.motion")===true)&&!quiet;
-    if(p.role==="workbench")return workbenchBar(t,this.width,()=>openOverlay({mod:"tinydust",kind:"dialog",width:560,height:640,props:{role:"usage",...(demo?{demo:true}:{})}})).on_size_change(measure);
+    if(p.role==="workbench")return workbenchBar(t,this.width,()=>openOverlay({mod:"tinydust",kind:"dialog",width:560,height:640,props:{role:"usage",...(demo?{demo:true}:{})}}),()=>this.openNoticeboard(demo)).on_size_change(measure);
     if(p.role==="brand"){
       const requested=demo?null:shared("tinydust.brandFont"),font=typeof requested==="string"&&requested.trim()?requested.trim():DEFAULT_BRAND_FONT;
       const lights=macLights(),usable=lights?Math.max(0,this.width-70):this.width,macRail=lights&&this.width<160;
@@ -262,6 +324,12 @@ export default class TinyDust extends View {
     }));
     const space=demo?{id:"sample",name:"Sunrise farm"}:spaces().find(s=>s.active);
     const list=all.filter(a=>a.space===space?.id);
+    let style=DEFAULT_FARM_STYLE,styleError="";
+    try {style=demo?SAMPLE_FARM_STYLE:farmStyle(readFarmStyles(shared(FARM_STYLE_KEY)),space?.id);}
+    catch {styleError="Saved farm choices could not be read; the original data was not changed.";}
+    if(this.waving&&(!motion||this.waveSpace!==space?.id||this.waving!==style.companion)){
+      this.companionTask?.cancel();this.companionTask=null;this.waving=null;this.waveSpace=null;
+    }
     if(this.dancing&&(!expanded||quiet||!list.length||this.danceSpace!==space?.id)){this.dancing=false;this.danceSpace=null;}
     const dancing=expanded&&this.dancing;
     if(!demo&&!expanded)setAgentOrder([...list,...all.filter(a=>a.space!==space?.id)].map(a=>a.address));
@@ -279,9 +347,9 @@ export default class TinyDust extends View {
       this.treeTask?.cancel();this.treeTask=null;this.shaken=null;this.treeAddress=null;this.treeMessage="";
     }
     this.page=page.page;
-    const garden=()=>farmScene(trees,page.agents,{width:this.width,motion,dancing,expanded,shaken:this.shaken,
-      onTree:(a,cx)=>this.touchTree(a,cx,motion),onAgent:(a,cx)=>this.focus(a,cx)});
-    const controls=()=>h_flex().h(34).px(8).gap(6).items_center().flex_none()
+    const garden=()=>farmScene(trees,page.agents,{width:this.width,motion,dancing,expanded,shaken:this.shaken,style,waving:this.waving,
+      onTree:(a,cx)=>this.touchTree(a,cx,motion),onAgent:(a,cx)=>this.focus(a,cx),onCompanion:(kind,cx)=>this.touchCompanion(kind,cx,motion,space?.id)});
+    const controls=()=>h_flex().min_h(34).px(8).py(2).gap(6).items_center().flex_wrap().flex_none()
       .child(button("motion",quiet?"Resume game":dancing?(motion?"Ambient on":"Ambient off"):motion?"Motion on":"Motion off",(_e,cx)=>{
         if(motion){this.dancing=false;this.danceSpace=null;}
         if(demo){this.demoMotion=!motion;cx.notify();}else {if(quiet)setShared("tinydust.quiet",false);setShared("tinydust.motion",!motion);}
@@ -290,9 +358,11 @@ export default class TinyDust extends View {
         if(quiet||!list.length)return;
         this.dancing=!dancing;this.danceSpace=this.dancing?space?.id:null;cx.notify();
       }).disabled(quiet||!list.length).tooltip(quiet?"Resume game to dance":!list.length?"Start an agent to dance":"A little dance just for this visit")))
-      .when(!expanded,e=>e.child(button("visit-farm","Visit farm",()=>openOverlay({mod:"tinydust",kind:"dialog",width:940,height:720,props:{role:"world",...(demo?{demo:true}:{})}}))))
+      .when(!expanded,e=>e.child(button("visit-farm","Visit farm",()=>openOverlay({mod:"tinydust",kind:"dialog",width:940,height:720,props:{role:"world",...(demo?{demo:true}:{})}})))
+        .child(button("noticeboard-sidebar","Board",()=>this.openNoticeboard(demo)).accessibility_label("Open farm noticeboard").tooltip("Open farm noticeboard")))
       .when(expanded&&Boolean(p.overlay),e=>e.child(button("leave-farm","Back to work",()=>closeOverlay(p.overlay))))
       .child(div().flex_1())
+      .when(expanded,e=>e.child(button("farm-style-open","Make it yours",()=>openOverlay({mod:"tinydust",kind:"dialog",width:450,height:610,props:{role:"farm-style",spaceId:space?.id,...(demo?{demo:true}:{})}})).disabled(!space)))
       .when(expanded,e=>e.child(button("clear-grove","Clear grove",()=>openOverlay({mod:"tinydust",kind:"popup",width:340,height:220,props:{role:"clear-grove",spaceId:space?.id,...(demo?{demo:true}:{})}})).disabled(!space||!archive||!trees.count)))
       .when(expanded&&!demo,e=>e.child(button("alert-settings","Alert settings",()=>run("app.settings",{section:"alerts"}))));
     const pager=()=>h_flex().h(32).px(8).gap(5).items_center().flex_none()
@@ -310,6 +380,7 @@ export default class TinyDust extends View {
           .tooltip(gardenError||"One tree for each agent terminal seen in this space. Trees stay after agents leave; up to 24 are drawn.")
           .child(gardenError||`${trees.count} ${trees.count===1?"tree":"trees"}${trees.count>trees.visible.length?` (${trees.visible.length} shown)`:""} · ${list.filter(a=>a.status==="working").length} working`)))
       .when(!narrow&&Boolean(paneNamesError),e=>e.child(div().px(10).py(4).text_size(10.5).text_color(t.blocked).truncate().tooltip(paneNamesError).child(paneNamesError)))
+      .when(!narrow&&Boolean(styleError),e=>e.child(div().px(10).py(4).text_size(10.5).text_color(t.blocked).truncate().tooltip(styleError).child(styleError)))
       .when(expanded,e=>e.child(v_flex().id("farm-visit-scroll").flex_1().min_h(0).items_center().overflow_y_scrollbar().child(garden())))
       .when(!expanded&&!narrow&&!quiet&&this.height>500,e=>e.child(garden()))
       .when(!narrow&&(expanded||(!quiet&&this.height>500)),e=>e.child(pager()))

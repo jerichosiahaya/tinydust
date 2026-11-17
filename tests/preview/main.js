@@ -22,7 +22,7 @@ export default class Preview extends View {
       .when(this.width<160,e=>e.items_center().child(div().h(29).flex().items_center().text_color(t.muted).child('+'))
         .children(['1','2','3'].map((name,i)=>div().w(32).h(26).flex().items_center().justify_center().rounded(4)
           .when(i===0,el=>el.bg(t.selected)).text_size(12).text_color(t.foreground).child(name))));
-    if(role==='workbench')return workbenchBar(t,this.width,()=>{}).on_size_change((size,cx)=>{if(size.width!==this.width){this.width=size.width;cx.notify();}});
+    if(role==='workbench')return workbenchBar(t,this.width,()=>{},()=>{}).on_size_change((size,cx)=>{if(size.width!==this.width){this.width=size.width;cx.notify();}});
     if(role==='terminal'){
       const target={pane:'sample-pane-1',terminal:'sample-1'},labels={version:1,labels:[{...target,name:'Plant the first seed'}]};
       const pane={...target,title:'Sample shell',cwd:'~/sample-garden',program:{name:'Sample shell',shell:true},status:'idle'};

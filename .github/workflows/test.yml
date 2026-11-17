@@ -12,4 +12,4 @@ jobs:
           node-version: '22'
       - run: npm test
       - run: python3 -m unittest discover -s tests -p '*_test.py' -v
-      - run: python3 scripts/draw-art.py && python3 scripts/draw-characters.py && git diff --exit-code -- mods/tinydust layouts/tinydust.svg
+      - run: python3 scripts/draw-art.py && python3 scripts/draw-characters.py && python3 scripts/draw-farm-details.py && git diff --exit-code -- mods/tinydust layouts/tinydust.svg
