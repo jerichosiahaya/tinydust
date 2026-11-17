@@ -13,6 +13,7 @@
 - **A little working world.** Characters water crop plots, rest on picnic blankets, wait at a help sign, or throw their arms up with **“Finished!”**. Click a character or its nameplate to focus the real agent. **Visit farm** opens a larger interactive scene; Escape or Back to work closes it.
 - **A grove that follows activity.** Each currently working agent in this space adds one tree. Tap a tree to see who it belongs to—and make it shake with motion enabled. Trees reflect current activity, not cumulative achievements or a productivity score.
 - **Completion you can notice.** Finished characters cheer and display a speech bubble. Herdr's existing completion toast gets a TinyDust portrait and “Harvest ready” styling; clicking it focuses that agent. Existing Herdr sounds are respected, with no second notification or extra loud sound.
+- **A gentle completion chime.** An original 1.2-second C-major melody is bundled. The installer selects it when no custom completion sound is set, preserving mute and existing custom sounds. **Herdr applies this sound globally, including other layouts.**
 - **A softer palette.** Dusty rose, lilac, sage, apricot, and denim blue, grounded by warm charcoal. Colorful and a little sweet without turning everything pink.
 - **A simpler journal.** Just **Now** and **Notes** up front. Notes save locally as you type. Expand **Tasks** when you need the list; it starts folded away. The same journal follows you across spaces.
 - **Small tasks, fewer buttons.** Expand Tasks, type a step and press Enter or Add. Use **Focus** to make it your one Now task, or the circle to complete it. Completed tasks can be reopened; the last completion can be undone.
@@ -56,9 +57,32 @@ python3 scripts/install.py
 herdr-app do layout.switch --name tinydust
 ```
 
-Review the installer before running it. It copies only TinyDust's layout, theme, preview art, and two mods into your Herdr config, then checks the mods. It refuses to overwrite existing TinyDust files unless you pass `--update`. It does not change your keyboard shortcuts, other layouts, or terminal sessions.
+Review the installer before running it. It copies TinyDust's layout, theme, art, bundled MP3, and two mods into your Herdr config, then checks the mods. It refuses to overwrite existing TinyDust files unless you pass `--update`. By default it also selects TinyDust's **global** completion sound if no custom one exists; use `--keep-sound` to leave sound settings alone. It does not overwrite other layout files, change keyboard shortcuts, or alter terminal sessions.
 
 You can also select **tinydust** in **Settings → Look**. If new mods aren't discovered immediately, restart Herdr once.
+
+### Default completion sound
+
+[Download/listen to the TinyDust chime](mods/tinydust/harvest-complete.mp3).
+
+Herdr 0.1.16 does **not** have per-layout sound defaults. The installer sets `sounds.done` in `settings.json` to `mods/tinydust/harvest-complete.mp3`, so it is used in **all Herdr layouts**, not only TinyDust. It still uses Herdr's normal completion delivery—there is no extra playback or duplicate alert.
+
+- No custom `sounds.done`: select the bundled chime.
+- An existing custom sound: keep it unchanged.
+- Muted sounds: stay muted. The blocked/request sound and unrelated settings are preserved.
+- Settings are backed up privately under `backups/tinydust-sound-<timestamp>/settings.json` before replacement. Invalid, symlinked, or concurrently changed settings are not knowingly overwritten.
+
+```sh
+# Install without changing the global completion sound:
+python3 scripts/install.py --keep-sound
+
+# Explicitly replace an existing custom sound with TinyDust's:
+python3 scripts/install.py --update --use-tinydust-sound
+```
+
+On updates, `--keep-sound` can also be combined with `--update`. To return to Herdr's built-in sound, remove only `sounds.done` from your Herdr `settings.json`, leaving other fields intact, and use `--keep-sound` on subsequent installs/updates. Manually copying layout/mod files does not select the chime; agents performing a manual installation should explain the global scope and follow the same preservation policy before changing settings.
+
+You can preview the selected completion sound in **Settings → Alerts**. The file has a conservative digital peak, but actual loudness depends on your system volume.
 
 ### Update
 
@@ -88,7 +112,7 @@ The installer backs up replaced code under `~/.config/herdr-app/backups/tinydust
 | Reduce visual load | Quiet view; Show more to return |
 | Toggle notes sidebar | Journal, in the top-left brand bar |
 | Animate the game | Motion on; off initially. Resume game leaves Quiet view and enables motion |
-| Configure completion sounds | Settings → Alerts, or Alert settings in Visit farm |
+| Preview/configure completion sound | Settings → Alerts, or Alert settings in Visit farm; the selected sound is global |
 | Navigate journal controls | Native buttons and inputs support keyboard focus; Enter submits a task |
 
 On a narrow window, hide the journal or collapse Herdr's sidebar. Small garden panels omit the landscape. The task list and scratchpad remain scrollable. This is a desktop layout, not a mobile UI.
@@ -116,6 +140,7 @@ No npm dependencies or build step are needed to run the layout. Node.js 22+ is u
 
 ```sh
 npm test
+python3 -m unittest discover -s tests -p '*_test.py' -v
 python3 scripts/draw-art.py
 python3 scripts/draw-characters.py
 python3 scripts/install.py --update
@@ -137,9 +162,13 @@ python3 scripts/check-native.py
 | `scripts/draw-art.py` | Deterministic, dependency-free farm SVG source |
 | `scripts/draw-characters.py` | Eight characters, work/rest/cheer poses, and lineup |
 | `scripts/check-native.py` | Populated, animated scene and toast checks in Herdr |
+| `scripts/make-chime.py` | Original synthesized chime source; rebuilding requires ffmpeg |
+| `scripts/completion_sound.py` | Default sound policy and backed-up settings update |
 | `scripts/screenshot.py` | Temporary sample-data preview; restores the previous layout |
 | `tests/` | State/render tests, native fixtures, and sample screenshot chrome |
 | `RECIPE.md` | Brief for rebuilding or remixing the layout |
+
+The MP3 is committed, so users do not need ffmpeg to install TinyDust. To regenerate it, install ffmpeg and run `python3 scripts/make-chime.py`. Playback uses Herdr's existing audio support; TinyDust does not install a player.
 
 To regenerate the README screenshot, install TinyDust, open Herdr at a comfortable desktop size (the current capture is 1920×1046), close overlays, then run:
 
@@ -151,10 +180,10 @@ The script temporarily switches layouts, substitutes sample data and the expande
 
 ### Validation
 
-Ten automated test cases cover creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; an additional fixture checks populated animated scenes, notification variants, and the creation menu. Creation routing is tested with host doubles; tests do not open real tabs or shells. Live and sample-data layouts were visually inspected on Linux. Full keyboard/screen-reader, end-to-end notification delivery, and cross-platform testing remain outstanding.
+Ten Node test cases cover creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; an additional fixture checks populated animated scenes, notification variants, and the creation menu. Creation routing is tested with host doubles; tests do not open real tabs or shells. Eight Python tests cover default/forced/opt-out sound selection, mute/custom-setting preservation, backups, invalid/symlinked/concurrently changed settings, failure cleanup, and installation in an isolated sandbox. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. Live and sample-data layouts were visually inspected on Linux. Full keyboard/screen-reader, end-to-end notification delivery, and cross-platform testing remain outstanding.
 
 ## Credits and license
 
-Inspired by the cozy farming-sim genre and the idea of agents as little characters in [Pixel HQ](https://github.com/bnhan2710/pixel-hq). The interactive farm also takes design inspiration from [World of Codecraft](https://github.com/kevinpardo/world-of-codecraft): status-specific work/rest areas, completion markers, clickable characters, and a larger world view. TinyDust's implementation and artwork are original; no World of Codecraft code, art, fonts, integrations, or hooks are bundled. No Stardew Valley or Harvest Moon assets, names, music, or characters are bundled; this is not affiliated with either game.
+Inspired by the cozy farming-sim genre and the idea of agents as little characters in [Pixel HQ](https://github.com/bnhan2710/pixel-hq). The interactive farm also takes design inspiration from [World of Codecraft](https://github.com/kevinpardo/world-of-codecraft): status-specific work/rest areas, completion markers, clickable characters, and a larger world view. TinyDust's implementation, artwork, and synthesized chime are original; no World of Codecraft code, art, fonts, integrations, or hooks are bundled. No Stardew Valley or Harvest Moon assets, names, music, or characters are bundled; this is not affiliated with either game.
 
 TinyDust is [MIT licensed](LICENSE). Herdr and the shipped mods that the layout references are separate projects under their own licenses; they aren't bundled here.
