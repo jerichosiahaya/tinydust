@@ -1,6 +1,6 @@
 import {View,div,image} from "gpui-kit";
 import {h_flex,v_flex,Button,Input,InputState} from "gpui-base";
-import {agents,spaces,run,setAgentOrder,shared,setShared,props,theme,openOverlay,closeOverlay} from "herdr";
+import {agents,spaces,run,setAgentOrder,shared,setShared,props,theme,openOverlay,closeOverlay,layout,window} from "herdr";
 import {STATES,UNKNOWN,characterFor,scenePage,grove} from "./game.js";
 import {actor,farmScene} from "./scene.js";
 import {toastView} from "./toast.js";
@@ -16,9 +16,16 @@ const SAMPLE=[
   {address:"sample-4",space:"sample",program:{name:"Writer"},tab_name:"Taking a little breather",status:"idle"},
   {address:"sample-5",space:"sample",program:{name:"Helper"},tab_name:"Looking after seedlings",status:"working"},
 ];
+const findNode=(node,id)=>node?.id===id?node:(node?.children??[]).map(child=>findNode(child,id)).find(Boolean);
 const DEFAULT_BRAND_FONT="Nads Handwriting";
 const button=(id,text,action)=>Button.new(id).accessibility_label(text).h(30).px(9).items_center().rounded(3)
   .bg(theme().raised).text_color(theme().foreground).text_size(11).on_click(action).child(text);
+const macLights=()=>{const w=window();return w?.platform==="macos"&&w.titlebar==="none"&&!w.fullscreen;};
+const newButton=(text,demo)=>button("create-open",text,()=>openOverlay({
+  mod:"tinydust",kind:"popup",width:280,height:196,
+  props:{role:"create-menu",target:demo?{}:creationTarget(),...(demo?{demo:true}:{})},
+})).accessibility_label("New tab, space, or terminal").tooltip("New tab, space, or terminal")
+  .on_mouse_down("left",(_e,cx)=>cx.stop_propagation());
 
 export default class TinyDust extends View {
   init(_p,cx) {
@@ -49,6 +56,20 @@ export default class TinyDust extends View {
       setShared(GROVE_KEY,clearGrove(state,p.spaceId,agents()));
       if(p.overlay)closeOverlay(p.overlay);
     } catch {this.clearError="Could not clear the grove. Saved data was not intentionally replaced.";cx.notify();}
+  }
+  toggleSidebar() {
+    if(props()?.demo)return;
+    const sidebar=findNode(layout(),"sidebar");
+    if(!sidebar||sidebar.hidden)return;
+    const width=typeof sidebar.size?.px==="number"?sidebar.size.px:this.width;
+    if(!Number.isFinite(width)||width<=0)return;
+    if(width>=160){
+      setShared("tinydust.sidebarWidth",Math.min(480,width));
+      run("layout.resize",{id:"sidebar",px:window()?.platform==="macos"?76:44});
+    } else {
+      const saved=shared("tinydust.sidebarWidth");
+      run("layout.resize",{id:"sidebar",px:typeof saved==="number"&&Number.isFinite(saved)&&saved>=160&&saved<=480?saved:300});
+    }
   }
   focus(a,cx) {
     if(props()?.demo){this.demoSelected=a.address;cx?.notify();return;}
@@ -85,25 +106,30 @@ export default class TinyDust extends View {
         .child(button("font-cancel","Cancel",()=>{if(p.overlay)closeOverlay(p.overlay);})))
       .child(div().text_size(10).text_color(t.dim).child("If a font is unavailable, your system uses a fallback."));
     if(p.overlay&&typeof p.title==="string")return toastView(p,t);
-    if(p.role==="space-shortcuts")return spaceShortcuts(t,demo);
+    const measure=(size,cx)=>{if(size.width!==this.width||size.height!==this.height){this.width=size.width;this.height=size.height;cx.notify();}};
+    if(p.role==="space-shortcuts"){
+      const collapsed=this.width<160,label=collapsed?"Expand sidebar":"Collapse sidebar";
+      return h_flex().id("space-shortcuts-bar").size_full().items_center().gap(4).on_size_change(measure)
+        .when(!collapsed,e=>e.pr(8).child(div().flex_1().min_w(0).h_full().child(spaceShortcuts(t,demo))))
+        .when(collapsed,e=>e.justify_center())
+        .when(collapsed&&macLights(),e=>e.child(newButton("+",demo)))
+        .child(Button.new("sidebar-toggle").accessibility_label(label).tooltip(label).w(28).h(28).flex_none().items_center().justify_center().rounded(4)
+          .bg(t.raised).text_color(t.foreground).text_size(19).on_click(()=>this.toggleSidebar()).child(collapsed?"›":"‹"));
+    }
     const quiet=!demo&&shared("tinydust.quiet")===true;
     const motion=(demo?this.demoMotion:shared("tinydust.motion")===true)&&!quiet;
-    const measure=(size,cx)=>{if(size.width!==this.width||size.height!==this.height){this.width=size.width;this.height=size.height;cx.notify();}};
     if(p.role==="workbench")return workbench(t,this.width).on_size_change(measure);
     if(p.role==="brand"){
       const requested=demo?null:shared("tinydust.brandFont"),font=typeof requested==="string"&&requested.trim()?requested.trim():DEFAULT_BRAND_FONT;
-      return h_flex().id("tinydust-brand").size_full().items_center().px(6).gap(6).on_size_change(measure)
-      .when(this.width>=80,e=>e.child(h_flex().id("brand-identity").flex_1().min_w(0).gap(5).items_center().tooltip("TinyDust")
+      const lights=macLights(),usable=lights?Math.max(0,this.width-70):this.width,macRail=lights&&this.width<160;
+      return h_flex().id("tinydust-brand").size_full().items_center().px(6).pl(lights?76:6).gap(6).on_size_change(measure)
+      .when(usable>=80,e=>e.child(h_flex().id("brand-identity").flex_1().min_w(0).gap(5).items_center().tooltip("TinyDust")
         .child(image("mods/tinydust/logo.svg").id("brand-logo").w(24).h(24).flex_none())
-        .when(this.width>=160,e=>e.child(div().id("brand-title").min_w(0).truncate().text_size(font==="Silkscreen"?14:19).font_family(font).text_color(t.accent).child("TinyDust")))))
-      .when(this.width>=300,e=>e.child(button("font-open","Aa",()=>openOverlay({mod:"tinydust",kind:"popup",width:320,height:240,props:{role:"font-menu",...(demo?{demo:true}:{})}}))
+        .when(usable>=160,e=>e.child(div().id("brand-title").min_w(0).truncate().text_size(font==="Silkscreen"?14:19).font_family(font).text_color(t.accent).child("TinyDust")))))
+      .when(usable>=300,e=>e.child(button("font-open","Aa",()=>openOverlay({mod:"tinydust",kind:"popup",width:320,height:240,props:{role:"font-menu",...(demo?{demo:true}:{})}}))
         .accessibility_label("Change TinyDust title font").tooltip("Change TinyDust title font").on_mouse_down("left",(_e,cx)=>cx.stop_propagation())))
-      .child(button("create-open",this.width>=260?"+ New":"+",()=>openOverlay({
-        mod:"tinydust",kind:"popup",width:280,height:196,
-        props:{role:"create-menu",target:demo?{}:creationTarget(),...(demo?{demo:true}:{})},
-      })).accessibility_label("New tab, space, or terminal").tooltip("New tab, space, or terminal")
-        .on_mouse_down("left",(_e,cx)=>cx.stop_propagation()))
-      .when(this.width>=220,e=>e.child(button("journal-toggle","Journal",()=>run("layout.toggle",{id:"journal"}))));
+      .when(!macRail,e=>e.child(newButton(usable>=260?"+ New":"+",demo)))
+      .when(usable>=220,e=>e.child(button("journal-toggle","Journal",()=>run("layout.toggle",{id:"journal"}))));
     }
     const all=demo?SAMPLE.map(a=>({...a,focused:a.address===this.demoSelected})):agents();
     const space=demo?{id:"sample",name:"Sunrise farm"}:spaces().find(s=>s.active);

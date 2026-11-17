@@ -21,13 +21,14 @@ function harness(preferences=new Map()) {
   let properties={},order=[],calls=[],timer=null;
   const spaceList=[{id:'here',name:'Garden',active:true,machine:'remote',tabs:[{id:'tab-here'}]}];
   const paneList=[{pane:'pane-here',tab:'tab-here',focused:true,terminal:'a0'}];
+  const sidebar={id:'sidebar',size:{px:300}},rootLayout={id:'root',children:[sidebar]},windowState={platform:'linux'};
   const data=['working','blocked','done','idle','future'].map((status,i)=>({address:'a'+i,space:'here',status,program:{name:'Agent '+i},tab_name:'Work'}));
   data.push({address:'elsewhere',space:'other',status:'working'});
   const cx={notify(){},focus_handle:()=>({focus(){}}),timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}}};
   const inputState={new:({value=''})=>({text:value,on(){},value(){return this.text;},set_value(value){this.text=value;}})};
   const context={View:class{},div:element,image:path=>element().image(path),h_flex:element,v_flex:element,Button:{new:id=>element().id(id)},Input:{new:()=>element()},InputState:inputState,
     props:()=>properties,theme:()=>new Proxy({},{get:()=> '#aabbcc'}),shared:k=>preferences.get(k),setShared:(k,v)=>preferences.set(k,v),
-    agents:()=>data,spaces:()=>spaceList,panes:()=>paneList,setAgentOrder:v=>order=v,run:(...args)=>calls.push(args),
+    agents:()=>data,spaces:()=>spaceList,panes:()=>paneList,layout:()=>rootLayout,window:()=>windowState,setAgentOrder:v=>order=v,run:(...args)=>calls.push(args),
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
@@ -36,7 +37,7 @@ function harness(preferences=new Map()) {
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':''),context);
   }
   const garden=new context.Garden();garden.init();
-  return {garden,cx,data,spaceList,paneList,preferences,calls,props:p=>{properties=p;},order:()=>Array.from(order),nodes:()=>flat(garden.render()),tick:()=>timer?.(cx)};
+  return {garden,cx,data,spaceList,paneList,sidebar,rootLayout,windowState,preferences,calls,props:p=>{properties=p;},order:()=>Array.from(order),nodes:()=>flat(garden.render()),tick:()=>timer?.(cx)};
 }
 
 test('New menu routes tab, space and terminal to captured targets; stale targets and demos are safe',()=>{
@@ -78,6 +79,36 @@ test('space shortcuts use stable icons, preserve Herdr colors and only switch va
   h.spaceList.pop();has(nodes,'space-shortcut-other').attrs.on_click[0]();assert.equal(h.calls.length,1);
   h.props({role:'space-shortcuts',demo:true});nodes=h.nodes();has(nodes,'space-shortcut-sample-a').attrs.on_click[0]();assert.equal(h.calls.length,1);
   assert.equal(h.preferences.get('space.colors').here,'ansi1');
+});
+
+test('sidebar toggle preserves width, uses the native rail, and is demo-safe',()=>{
+  const h=harness();h.props({role:'space-shortcuts'});h.sidebar.size.px=360;h.garden.width=360;
+  let nodes=h.nodes();assert.equal(has(nodes,'sidebar-toggle').attrs.accessibility_label[0],'Collapse sidebar');
+  assert(has(nodes,'space-shortcut-here'));has(nodes,'sidebar-toggle').attrs.on_click[0]();
+  assert.equal(h.preferences.get('tinydust.sidebarWidth'),360);assert.equal(h.calls.at(-1)[0],'layout.resize');
+  assert.equal(h.calls.at(-1)[1].id,'sidebar');assert.equal(h.calls.at(-1)[1].px,44);
+  h.sidebar.size.px=44;h.garden.width=44;nodes=h.nodes();
+  assert.equal(has(nodes,'sidebar-toggle').attrs.accessibility_label[0],'Expand sidebar');assert(!has(nodes,'space-shortcut-here'));
+  has(nodes,'sidebar-toggle').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].px,360);
+  h.preferences.set('tinydust.sidebarWidth',999);has(nodes,'sidebar-toggle').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].px,300);
+  h.windowState.platform='macos';h.sidebar.size.px=275;h.garden.width=275;has(h.nodes(),'sidebar-toggle').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].px,76);
+  h.sidebar.size.px=76;h.garden.width=76;has(h.nodes(),'sidebar-toggle').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].px,275);
+  h.sidebar.size={weight:1};h.garden.width=220;has(h.nodes(),'sidebar-toggle').attrs.on_click[0]();assert.equal(h.preferences.get('tinydust.sidebarWidth'),220);
+  const count=h.calls.length;h.props({role:'space-shortcuts',demo:true});has(h.nodes(),'sidebar-toggle').attrs.on_click[0]();assert.equal(h.calls.length,count);
+  h.props({role:'space-shortcuts'});h.rootLayout.children=[];has(h.nodes(),'sidebar-toggle').attrs.on_click[0]();assert.equal(h.calls.length,count);
+});
+
+test('macOS traffic lights keep New and Expand accessible on the rail',()=>{
+  const h=harness();Object.assign(h.windowState,{platform:'macos',titlebar:'none',fullscreen:false});
+  h.sidebar.size.px=76;h.garden.width=76;h.props({role:'brand'});
+  assert(!has(h.nodes(),'create-open'));h.props({role:'space-shortcuts'});
+  let nodes=h.nodes();assert(has(nodes,'create-open'));assert(has(nodes,'sidebar-toggle'));
+  has(nodes,'create-open').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].props.role,'create-menu');
+  h.props({role:'brand'});h.garden.width=300;nodes=h.nodes();
+  assert(has(nodes,'brand-title'));assert(has(nodes,'create-open'));assert(has(nodes,'journal-toggle'));
+  assert.equal(has(nodes,'tinydust-brand').attrs.pl[0],76);
+  h.windowState.fullscreen=true;h.garden.width=76;assert(has(h.nodes(),'create-open'));
+  h.props({role:'space-shortcuts'});assert(!has(h.nodes(),'create-open'));
 });
 
 test('title font is customizable, validated and demo-safe without touching other fonts',()=>{
