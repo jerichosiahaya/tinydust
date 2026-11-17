@@ -1,4 +1,4 @@
-import {View,div} from "gpui-kit";
+import {View,div,image} from "gpui-kit";
 import {h_flex,v_flex,Button,Input,InputState} from "gpui-base";
 import {agents,spaces,run,setAgentOrder,shared,setShared,props,theme,openOverlay,closeOverlay} from "herdr";
 import {STATES,UNKNOWN,characterFor,scenePage,grove} from "./game.js";
@@ -92,10 +92,12 @@ export default class TinyDust extends View {
     if(p.role==="brand"){
       const requested=demo?null:shared("tinydust.brandFont"),font=typeof requested==="string"&&requested.trim()?requested.trim():"Silkscreen";
       return h_flex().id("tinydust-brand").size_full().items_center().px(6).gap(6).on_size_change(measure)
-      .when(this.width>=160,e=>e.child(div().id("brand-title").text_size(15).font_family(font).text_color(t.accent).child(this.width<260?"TD":"TinyDust")).child(div().flex_1()))
-      .when(this.width>=200,e=>e.child(button("font-open","Aa",()=>openOverlay({mod:"tinydust",kind:"popup",width:320,height:240,props:{role:"font-menu",...(demo?{demo:true}:{})}}))
+      .when(this.width>=80,e=>e.child(h_flex().id("brand-identity").flex_1().min_w(0).gap(5).items_center().tooltip("TinyDust")
+        .child(image("mods/tinydust/logo.svg").id("brand-logo").w(24).h(24).flex_none())
+        .when(this.width>=160,e=>e.child(div().id("brand-title").min_w(0).truncate().text_size(font==="Silkscreen"?14:19).font_family(font).text_color(t.accent).child("TinyDust")))))
+      .when(this.width>=300,e=>e.child(button("font-open","Aa",()=>openOverlay({mod:"tinydust",kind:"popup",width:320,height:240,props:{role:"font-menu",...(demo?{demo:true}:{})}}))
         .accessibility_label("Change TinyDust title font").tooltip("Change TinyDust title font").on_mouse_down("left",(_e,cx)=>cx.stop_propagation())))
-      .child(button("create-open",this.width>=160?"+ New":"+",()=>openOverlay({
+      .child(button("create-open",this.width>=260?"+ New":"+",()=>openOverlay({
         mod:"tinydust",kind:"popup",width:280,height:196,
         props:{role:"create-menu",target:demo?{}:creationTarget(),...(demo?{demo:true}:{})},
       })).accessibility_label("New tab, space, or terminal").tooltip("New tab, space, or terminal")

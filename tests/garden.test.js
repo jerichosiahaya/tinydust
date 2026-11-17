@@ -98,6 +98,19 @@ test('title font is customizable, validated and demo-safe without touching other
   h.props({role:'brand',demo:true});assert.equal(has(h.nodes(),'brand-title').attrs.font_family[0],'Silkscreen');
 });
 
+test('brand shows the TinyDust wordmark and cottage without abbreviating it',()=>{
+  const h=harness();h.props({role:'brand'});
+  assert(readFileSync(new URL('../mods/tinydust/logo.svg',import.meta.url),'utf8').includes('<svg'));
+  for(const width of [160,220,260,300,480]){
+    h.garden.width=width;const nodes=h.nodes();
+    assert(has(nodes,'brand-logo'));assert(has(nodes,'brand-title'));assert(nodes.includes('TinyDust'));assert(!nodes.includes('TD'));
+    assert(has(nodes,'create-open'));assert.equal(Boolean(has(nodes,'journal-toggle')),width>=220);
+    assert.equal(Boolean(has(nodes,'font-open')),width>=300);
+  }
+  h.garden.width=80;let nodes=h.nodes();assert(has(nodes,'brand-logo'));assert(!has(nodes,'brand-title'));assert(has(nodes,'create-open'));
+  h.garden.width=44;nodes=h.nodes();assert(!nodes.includes('TD'));assert(has(nodes,'create-open'));
+});
+
 test('workbench decoration stays outside the terminal and preserves native pane controls',()=>{
   const h=harness();h.props({role:'workbench'});
   let nodes=h.nodes();assert(has(nodes,'workbench-trim'));assert(nodes.includes('The workbench'));
