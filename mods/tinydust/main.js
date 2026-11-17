@@ -5,6 +5,7 @@ import {STATES,UNKNOWN,characterFor,scenePage,grove} from "./game.js";
 import {actor,farmScene} from "./scene.js";
 import {toastView} from "./toast.js";
 import {creationTarget,creationMenu} from "./creation.js";
+import {workbench} from "./workbench.js";
 
 const SAMPLE=[
   {address:"sample-1",space:"sample",program:{name:"Builder"},tab_name:"Plant the first seed",status:"working"},
@@ -42,6 +43,7 @@ export default class TinyDust extends View {
     const quiet=!demo&&shared("tinydust.quiet")===true;
     const motion=(demo?this.demoMotion:shared("tinydust.motion")===true)&&!quiet;
     const measure=(size,cx)=>{if(size.width!==this.width||size.height!==this.height){this.width=size.width;this.height=size.height;cx.notify();}};
+    if(p.role==="workbench")return workbench(t,this.width).on_size_change(measure);
     if(p.role==="brand")return h_flex().id("tinydust-brand").size_full().items_center().px(6).gap(6).on_size_change(measure)
       .when(this.width>=160,e=>e.child(div().text_size(17).font_bold().text_color(t.accent).child(this.width<240?"TD":"TinyDust")).child(div().flex_1()))
       .child(button("create-open",this.width>=160?"+ New":"+",()=>openOverlay({

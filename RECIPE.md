@@ -11,7 +11,7 @@ An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and anim
 - Up to six characters per page, or three in shorter sidebar panels. Previous/Next reaches everyone. A focused agent gets a pale ground marker; a newly focused off-page agent brings its page into view. A compact, scrollable agent list remains below. Small or Quiet sidebars omit the scene but keep this list.
 - Visit farm opens a 940×720 native dialog with the same live farm, larger sprites, Back to work, and Alert settings. The world is at most 960px wide and scrolls vertically if needed. Escape closes it. No terminal sessions or workspaces are created or closed.
 - Eight characters: Miso/cat, Clover/rabbit, Maple/fox, Cocoa/bear, Fern/frog, Sunny/duck, Rowan/farmer, Sage/gardener. Muted lilac, rose, sage, honey, and teal. They are artwork for existing agents, not additional running agents.
-- Center: Herdr's normal tab bar, active terminal splits, pane controls, Files/Changes panels and status bar. Right: 320px Journal, resizable 280–460, with Now, 240px multiline Notes, and collapsed Tasks.
+- Center: Herdr's normal tab bar, active terminal splits, pane controls, Files/Changes panels and status bar. The active tab sits in a softly bordered workbench frame with a tiny original pixel sprout, a short label, and sage/rose/honey trim. A 2px accent border marks the focused pane. The trim is outside terminal content, costs a little vertical/horizontal space, and contains no controls or animation. Right: 320px Journal, resizable 280–460, with Now, 240px multiline Notes, and collapsed Tasks.
 - Terminal `#28262b`, text `#f2e7e2`, chrome `#302c33`, accent `#e8b4c4`. Respect the user's fonts. Keep text readable; no flashing warnings or reward counters.
 
 ## How it behaves
@@ -31,10 +31,10 @@ An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and anim
 
 ## Built from
 
-- `layouts/tinydust.json`: root row → sidebar + work column; work body → active tab, hidden Files/Changes, journal. Root `toast: "tinydust"`.
+- `layouts/tinydust.json`: root row → sidebar + work column; work body → workbench frame (trim + active tab), hidden Files/Changes, journal. Keep `main` as the active-tab block; use Herdr's shipped `pane` header rather than replacing native pane controls. Root `toast: "tinydust"`.
 - `themes/tinydust.json`: ANSI and semantic panel colors.
 - `mods/tinydust/main.js`: brand/default garden/`role: "world"` dispatch, measured dimensions, page selection, tree interaction, overlay controls. Notification props (`overlay` plus `title`) dispatch to `toastView`.
-- `creation.js`: native three-choice creation popup, current context capture, stale-target checks and explicit native commands. `game.js`: pure status labels, stable character identity, pagination, working-grove count, bounded lane positions. `scene.js`: native drawing, original work/rest/cheer sprites, water, nameplates, tree clicks, optional motion. `toast.js`: notification presentation, dismissal, and original actions.
+- `workbench.js`: non-interactive trim with `workbench-sprout.svg`; remove the decorative line/dots below 200px. No text, input or controls overlap the terminal. `creation.js`: native three-choice creation popup, current context capture, stale-target checks and explicit native commands. `game.js`: pure status labels, stable character identity, pagination, working-grove count, bounded lane positions. `scene.js`: native drawing, original work/rest/cheer sprites, water, nameplates, tree clicks, optional motion. `toast.js`: notification presentation, dismissal, and original actions.
 - `mods/tinydust-journal`: native input, textarea and buttons; validation and immutable task operations in `state.js`. Per-copy localStorage schema `{version:1, notes, tasks:[{id,text,done}], now}`.
 - Shared settings: `tinydust.motion`, `tinydust.quiet`. The installer may update global `sounds.done` under the documented policy; runtime mods do not rewrite settings. No journal schema changes or new keyboard bindings.
 - Shipped mods referenced, not bundled: spaces, tabs, pane, files, changes, workspace-chrome, workspace-status. Use Herdr live data, normal focus/layout/overlay commands and theme colors. Runtime mods perform no network calls, background helper subprocesses, agent-plugin installs, terminal-output reads, or project-file reads. Explicit New menu choices do create shells through Herdr commands.
@@ -47,7 +47,7 @@ An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and anim
 - Keep scene unit hit boxes narrow: full-scene overlapping wrappers can swallow another unit's clicks. Keep decorative layers noninteractive and provide native named Buttons for actions.
 - Bound scenes through pagination, not by silently dropping agents. Tree cap must be visible in the text, and all relevant agents must contribute to the counter, including off-page ones.
 - A snapshot's demo props must never focus a real agent, write the personal journal, or change real motion/Quiet preferences. Sample world state is separate.
-- The screenshot substitutes the expanded farm for terminal content and marks sample data explicitly. The regular center remains terminals; Visit farm is a dialog.
+- Screenshot modes substitute either the expanded farm or a clearly labeled mock terminal for real terminal content; both mark sample data explicitly. The regular center remains real terminals; Visit farm is a dialog. The staged preview copies only the decorative trim and does not need to install it first.
 - Never publish config data, shared state, real terminal screenshots, or personal notes. No game asset packs or World of Codecraft sources are included; its work/rest/marker/expanded-map patterns are design inspiration only.
 - GPUI is native, not HTML/CSS. Read installed generated types. `herdr-app check` alone does not cover all later states; check populated scene and toast fixtures too.
 - No task edit/delete/export UI, cloud sync, tool-specific animations, custom agent hooks, pathfinding, XP, combat, or OS push notifications in this version. Quiet does not silence Herdr's own sounds. Full keyboard/screen-reader and cross-platform behavior remain unverified.
@@ -55,8 +55,8 @@ An interactive, 8-bit-inspired Herdr farm with a rose roof, sage grass, and anim
 ## Done when
 
 1. Both mods pass `herdr-app check`, and `python3 scripts/check-native.py` passes populated animated/static scenes and completion/generic toast variants.
-2. Ten Node tests pass: creation routing/stale targets/demo isolation, journal persistence/undo/error handling plus tree counts/caps, pagination, focus targets, character stability, pose assets, tree feedback, Quiet/motion, demo isolation and native completion-payload handling.
-3. Inspect normal and sample-data layouts. Verify characters stay inside their lanes, trees stand on ground, names/bubbles remain readable and every agent is reachable.
+2. Eleven Node tests pass: the workbench stays decorative and retains native pane headers, creation routing/stale targets/demo isolation, journal persistence/undo/error handling plus tree counts/caps, pagination, focus targets, character stability, pose assets, tree feedback, Quiet/motion, demo isolation and native completion-payload handling.
+3. Inspect sample-data layouts: farm and mock-terminal previews. Verify the workbench doesn't overlay text, characters stay inside their lanes, trees stand on ground, names/bubbles remain readable and every agent is reachable. Narrow workbench paths are exercised by native fixtures; a full constrained-window visual pass remains outstanding.
 4. Confirm existing terminals and the journal remain intact. Nothing sends input to an agent or starts another agent. Only explicit New menu selections create shells/spaces; test fixtures must not create real sessions.
 5. Confirm the public screenshot contains only labeled sample data. Document that completion delivery and playback are owned by Herdr, not duplicated by a mod observer.
 6. Eight Python sound/installer tests pass, covering first/repeated install, custom and mute preservation, opt-out/force behavior, backups, invalid/symlinked/stale settings, write failures and a sandboxed installer. Decode the MP3 and verify duration/peak/no clipping after regenerating it. The installed asset must exist and match the selected global path.

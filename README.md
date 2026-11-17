@@ -6,6 +6,8 @@
 
 *Captured in Herdr with labeled sample agents, tasks, and workspace. The center demonstrates the expanded farm; normally your terminals live there and “Visit farm” opens the larger scene in a dialog. No personal notes, conversations, or project names are included.*
 
+[See the workbench with a labeled mock terminal](preview-workbench.png).
+
 ## A small, useful place
 
 - **Original pixel farm.** A tiled roof, vegetable beds, orchard, pond, and a sleeping cat. Stepped highlights, contact shadows, and diagonal cast shadows add depth without blurring the pixels. No ripped game assets.
@@ -14,6 +16,7 @@
 - **A grove that follows activity.** Each currently working agent in this space adds one tree. Tap a tree to see who it belongs to—and make it shake with motion enabled. Trees reflect current activity, not cumulative achievements or a productivity score.
 - **Completion you can notice.** Finished characters cheer and display a speech bubble. Herdr's existing completion toast gets a TinyDust portrait and “Harvest ready” styling; clicking it focuses that agent. Existing Herdr sounds are respected, with no second notification or extra loud sound.
 - **A gentle completion chime.** An original 1.2-second C-major melody is bundled. The installer selects it when no custom completion sound is set, preserving mute and existing custom sounds. **Herdr applies this sound globally, including other layouts.**
+- **A cozy workbench.** A tiny pixel sprout and garden-colored trim frame the terminal area; a clearer rose outline marks the focused pane. The decoration sits outside your terminal text. Herdr's original pane headers, split/zoom/close controls, fonts, and terminal colors stay intact.
 - **A softer palette.** Dusty rose, lilac, sage, apricot, and denim blue, grounded by warm charcoal. Colorful and a little sweet without turning everything pink.
 - **A simpler journal.** Just **Now** and **Notes** up front. Notes save locally as you type. Expand **Tasks** when you need the list; it starts folded away. The same journal follows you across spaces.
 - **Small tasks, fewer buttons.** Expand Tasks, type a step and press Enter or Add. Use **Focus** to make it your one Now task, or the circle to complete it. Completed tasks can be reopened; the last completion can be undone.
@@ -158,6 +161,7 @@ python3 scripts/check-native.py
 | `mods/tinydust/scene.js` | Native scene drawing, working/resting/cheering poses, interaction targets |
 | `mods/tinydust/toast.js` | Existing Herdr notifications in TinyDust style |
 | `mods/tinydust/creation.js` | Unified creation menu with captured/stale-target checks |
+| `mods/tinydust/workbench.js` | Decorative workbench trim; uses the original pixel sprout SVG |
 | `mods/tinydust-journal/` | Notes, tasks, Quiet view, storage |
 | `scripts/draw-art.py` | Deterministic, dependency-free farm SVG source |
 | `scripts/draw-characters.py` | Eight characters, work/rest/cheer poses, and lineup |
@@ -174,13 +178,14 @@ To regenerate the README screenshot, install TinyDust, open Herdr at a comfortab
 
 ```sh
 python3 scripts/screenshot.py
+python3 scripts/screenshot.py --terminal
 ```
 
-The script temporarily switches layouts, substitutes sample data and the expanded farm for private content, captures `preview.png`, then restores the previous layout. **Always inspect the whole image before publishing it.**
+The script temporarily switches layouts and substitutes sample data for private content. It captures the expanded farm as `preview.png` or a **mock**, non-interactive terminal as `preview-workbench.png`; then it restores the previous layout if the preview is still active. **Always inspect the whole image before publishing it.**
 
 ### Validation
 
-Ten Node test cases cover creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; an additional fixture checks populated animated scenes, notification variants, and the creation menu. Creation routing is tested with host doubles; tests do not open real tabs or shells. Eight Python tests cover default/forced/opt-out sound selection, mute/custom-setting preservation, backups, invalid/symlinked/concurrently changed settings, failure cleanup, and installation in an isolated sandbox. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. Live and sample-data layouts were visually inspected on Linux. Full keyboard/screen-reader, end-to-end notification delivery, and cross-platform testing remain outstanding.
+Eleven Node test cases cover decorative workbench layout and preservation of native pane headers, creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; an additional fixture checks populated animated scenes, notification variants, the creation menu, and workbench trim at two widths. Creation routing is tested with host doubles; tests do not open real tabs or shells. Eight Python tests cover default/forced/opt-out sound selection, mute/custom-setting preservation, backups, invalid/symlinked/concurrently changed settings, failure cleanup, and installation in an isolated sandbox. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. The workbench was visually inspected using a labeled mock terminal on Linux, not actual terminal output; narrow rendering was exercised by native fixtures and host doubles. Full keyboard/screen-reader, split-pane interaction, end-to-end notification delivery, constrained-window visual inspection, and cross-platform testing remain outstanding.
 
 ## Credits and license
 

@@ -30,7 +30,7 @@ function harness() {
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
-  for(const file of ['game.js','scene.js','toast.js','creation.js','main.js']){
+  for(const file of ['game.js','scene.js','toast.js','creation.js','workbench.js','main.js']){
     const source=readFileSync(new URL('../mods/tinydust/'+file,import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export (function|const) /g,'$1 ').replace('export default class TinyDust','class TinyDust');
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':''),context);
   }
@@ -63,6 +63,21 @@ test('New menu routes tab, space and terminal to captured targets; stale targets
   assert.equal(h.calls.length,count);
   h.props({role:'brand',demo:true});h.garden.width=44;
   assert(has(h.nodes(),'create-open'));assert(!has(h.nodes(),'journal-toggle'));
+});
+
+test('workbench decoration stays outside the terminal and preserves native pane controls',()=>{
+  const h=harness();h.props({role:'workbench'});
+  let nodes=h.nodes();assert(has(nodes,'workbench-trim'));assert(nodes.includes('The workbench'));
+  assert(nodes.some(n=>n.attrs?.image?.[0]==='mods/tinydust/workbench-sprout.svg'));
+  assert(!nodes.some(n=>n.attrs?.on_click));assert.equal(h.calls.length,0);
+  h.garden.width=100;nodes=h.nodes();assert(has(nodes,'workbench-trim'));assert(nodes.includes('The workbench'));
+  const layout=JSON.parse(readFileSync(new URL('../layouts/tinydust.json',import.meta.url),'utf8'));
+  const visit=node=>[node,...(node.children??[]).flatMap(visit)], all=visit(layout);
+  const shell=all.find(node=>node.id==='workbench'),main=all.find(node=>node.id==='main');
+  assert(shell.children.includes(main));assert.equal(main.content.tab,'active');
+  assert.equal(main.content.pane.header.content.mod,'pane');assert.equal(main.content.pane.header.reveal,'always');
+  assert.equal(main.content.pane.focus.color,'accent');assert.equal(main.content.pane.focus.width,2);
+  assert.equal(layout.terminal_padding[0],14);assert.equal(layout.terminal_padding[1],12);
 });
 
 test('working agents grow trees; counts stay honest and large scenes stay bounded',()=>{
