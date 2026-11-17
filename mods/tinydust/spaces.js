@@ -1,6 +1,7 @@
-import {div,image} from "gpui-kit";
+import {image} from "gpui-kit";
 import {h_flex,v_flex,Button} from "gpui-base";
 import {agents,spaces,shared,run,openOverlay} from "herdr";
+import {spaceStatuses,statusDescription,statusMarks} from "./space-status.js";
 
 // Match Herdr's space-avatar colors without changing its saved assignments.
 const COLORS={ansi6:"#22a99a",ansi3:"#e3814f",ansi4:"#5b8def",ansi5:"#8b7cf6",ansi2:"#3fae6a",ansi1:"#d9649a"};
@@ -9,36 +10,36 @@ const SPACE_SAMPLE=[{id:"sample-a",name:"Sunrise farm",active:true,status:"block
 const PALETTE=Object.keys(COLORS);
 const spaceHash=id=>{let hash=0;for(const char of String(id))hash=(hash*31+char.codePointAt(0))>>>0;return hash;};
 export function spaceIcon(id) {return ICONS[spaceHash(id)%ICONS.length];}
-function badge(s,t,colors,demo,rail,working,motion) {
+function badge(s,t,colors,demo,rail,states,motion) {
   const color=colors&&typeof colors==='object'?colors[s.id]:null;
   const fill=Object.prototype.hasOwnProperty.call(COLORS,color)?COLORS[color]:
     typeof color==='string'&&/^#[\da-f]{6}([\da-f]{2})?$/i.test(color)?color:
     typeof color==='string'&&typeof t[color]==='string'?t[color]:COLORS[PALETTE[spaceHash(s.id)%PALETTE.length]];
   const status=["working","blocked","done","idle"].includes(s.status)?s.status:null;
-  const label=`${s.active?"Selected space":"Switch to space"}: ${s.name}${s.machine?` · ${s.machine}`:""}${status?` · ${status}`:""}${working&&status!=="working"?" · agent working":""}`;
+  const description=statusDescription(states);
+  const label=`${s.active?"Selected space":"Switch to space"}: ${s.name}${s.machine?` · ${s.machine}`:""}${description?` · ${description}`:status?` · ${status}`:""}`;
   return Button.new(`${rail?"space-rail":"space-shortcut"}-${s.id}`).accessibility_label(label).tooltip(label)
-    .relative().w(28).h(28).flex_none().items_center().justify_center().rounded(5).bg(fill)
-    .border(s.active?2:1).border_color(s.active?t.foreground:t.border)
+    .w(40).h(30).flex_none().items_center().gap(1)
     .on_click(()=>{if(!demo&&spaces().some(space=>space.id===s.id))run("space.select",{id:s.id});})
     .on_mouse_down("right",(_e,cx)=>{if(!demo&&rail&&spaces().some(space=>space.id===s.id)){cx.stop_propagation();openOverlay({mod:"menu",kind:"popup",width:200,height:260,props:{tab:"space",target:{id:s.id}}});}})
-    .child(image(`mods/tinydust/space-${spaceIcon(s.id)}.svg`).w(16).h(16).flex_none())
-    .when(working,e=>e.child(div().id(`space-working-${rail?"rail":"shortcut"}-${s.id}`).absolute().right(-1).top(-1)
-      .w(9).h(9).rounded(5).bg(t.working).border(1).border_color(t.chrome)
-      .when(motion,dot=>dot.loop("opacity",{from:0.7,to:1,period:1800,easing:"ease-in-out"}))))
-    .when(rail&&Boolean(status)&&status!=="working",e=>e.child(div().absolute().right(0).bottom(0).w(7).h(7).rounded(4).bg(t[status]??t.unknown).border(1).border_color(t.chrome)));
+    .child(h_flex().w(28).h(28).flex_none().items_center().justify_center().rounded(5).bg(fill)
+      .border(s.active?2:1).border_color(s.active?t.foreground:t.border)
+      .child(image(`mods/tinydust/space-${spaceIcon(s.id)}.svg`).w(16).h(16).flex_none()))
+    .child(statusMarks(s.id,states,t,motion,true));
 }
 function entries(demo) {
-  const working=demo?new Set(["sample-a"]):new Set(agents().filter(a=>a.status==="working").map(a=>a.space));
+  const list=demo?SPACE_SAMPLE:spaces();
+  const agentList=demo?[{space:"sample-a",status:"working"},{space:"sample-a",status:"blocked"},{space:"sample-a",status:"done"},{space:"sample-c",status:"done"}]:agents();
   const motion=!demo&&shared("tinydust.motion")===true&&shared("tinydust.quiet")!==true;
-  return [demo?SPACE_SAMPLE:spaces(),demo?{"sample-a":"ansi1","sample-b":"ansi6","sample-c":"ansi4"}:shared("space.colors"),working,motion];
+  return [list,demo?{"sample-a":"ansi1","sample-b":"ansi6","sample-c":"ansi4"}:shared("space.colors"),spaceStatuses(agentList),motion];
 }
 export function spaceShortcuts(t,demo=false) {
-  const [list,colors,working,motion]=entries(demo);
+  const [list,colors,states,motion]=entries(demo);
   return h_flex().id("space-shortcuts").size_full().min_w(0).px(8).gap(6).items_center().overflow_x_scrollbar()
-    .children(list.map(s=>badge(s,t,colors,demo,false,working.has(s.id),motion)));
+    .children(list.map(s=>badge(s,t,colors,demo,false,states.get(s.id),motion)));
 }
 export function compactSpaces(t,demo=false) {
-  const [list,colors,working,motion]=entries(demo);
+  const [list,colors,states,motion]=entries(demo);
   return v_flex().id("compact-spaces-list").size_full().min_h(0).items_center().gap(4).pt(4).overflow_y_scrollbar()
-    .children(list.map(s=>badge(s,t,colors,demo,true,working.has(s.id),motion)));
+    .children(list.map(s=>badge(s,t,colors,demo,true,states.get(s.id),motion)));
 }

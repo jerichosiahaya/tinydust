@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 from completion_sound import configure_sound
+from space_state import migrate_space_state
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
@@ -20,7 +21,8 @@ home = Path(os.environ.get('HERDR_APP_HOME') or Path(os.environ.get('XDG_CONFIG_
 if not (home/'AGENTS.md').exists():
     raise SystemExit('Open Herdr once first. No files installed.')
 files = [Path('layouts/tinydust.json'), Path('layouts/tinydust.svg'), Path('themes/tinydust.json')]
-for mod in ['tinydust', 'tinydust-journal']:
+mods = ['tinydust', 'tinydust-journal', 'tinydust-spaces']
+for mod in mods:
     files += [p.relative_to(root) for p in (root/'mods'/mod).iterdir() if p.suffix in ['.js','.json','.svg','.mp3','.txt','.py'] and p.name != 'jsconfig.json']
     font_dir = root/'mods'/mod/'fonts'
     if font_dir.exists():
@@ -37,6 +39,10 @@ if conflicts:
         (backup/f).parent.mkdir(parents=True,exist_ok=True)
         shutil.copy2(home/f,backup/f)
     print('Previous code saved to', backup)
+try:
+    print(migrate_space_state(home))
+except (ValueError, OSError) as error:
+    raise SystemExit(f'Spaces preferences were not changed; layout files were not installed: {error}')
 def matches(f):
     target = home/f
     if not target.is_file():
@@ -66,7 +72,7 @@ try:
 finally:
     for temporary, _ in staged:
         temporary.unlink(missing_ok=True)
-for mod in ['tinydust','tinydust-journal']:
+for mod in mods:
     subprocess.run(['herdr-app','check',str(home/'mods'/mod)],check=True)
 try:
     print(configure_sound(home, keep=args.keep_sound, force=args.use_tinydust_sound))

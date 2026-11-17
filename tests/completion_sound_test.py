@@ -96,6 +96,28 @@ class CompletionSoundTests(unittest.TestCase):
         self.assertEqual(target.read_text(), '{"zoom": 1}')
 
     @unittest.skipIf(os.name == 'nt', 'POSIX CLI stub; sound policy tests above are platform-independent')
+    def test_installer_refuses_invalid_spaces_storage_before_changing_layout(self):
+        binary = self.home / 'bin'
+        binary.mkdir()
+        checker = binary / 'herdr-app'
+        checker.write_text('#!/bin/sh\n[ "$1" = "check" ]\n')
+        checker.chmod(0o755)
+        (self.home / 'AGENTS.md').write_text('Test sandbox')
+        source = self.home / 'data/spaces/store.json'
+        source.parent.mkdir(parents=True)
+        source.write_text('{broken')
+        layout = self.home / 'layouts/tinydust.json'
+        layout.parent.mkdir(parents=True)
+        layout.write_text('{"keep":"existing layout"}')
+        before = layout.read_bytes()
+        env = {**os.environ, 'HERDR_APP_HOME': str(self.home), 'PATH': str(binary) + os.pathsep + os.environ.get('PATH', '')}
+        result = subprocess.run([sys.executable, str(ROOT / 'scripts/install.py'), '--update', '--keep-sound'], env=env, capture_output=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(layout.read_bytes(), before)
+        self.assertEqual(source.read_text(), '{broken')
+        self.assertFalse((self.home / 'data/tinydust-spaces/store.json').exists())
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX CLI stub; sound policy tests above are platform-independent')
     def test_installer_copies_real_mp3_and_applies_default_only_in_sandbox(self):
         # Stub the native checker so this test never talks to a real Herdr window.
         binary = self.home / 'bin'
@@ -109,6 +131,10 @@ class CompletionSoundTests(unittest.TestCase):
         shared = self.home / 'shared.json'
         shared.write_text(json.dumps({'tinydust.brandFont': 'Custom Font', 'other': {'keep': True}}))
         original_shared = shared.read_bytes()
+        native_state = self.home / 'data/spaces/store.json'
+        native_state.parent.mkdir(parents=True)
+        native_state.write_text(json.dumps({'machines.folded': '["sample-remote"]'}))
+        native_before = native_state.read_bytes()
         env = {**os.environ, 'HERDR_APP_HOME': str(self.home), 'PATH': str(binary) + os.pathsep + os.environ.get('PATH', '')}
         subprocess.run([sys.executable, str(ROOT / 'scripts/install.py')], env=env, check=True, capture_output=True)
         self.assertEqual((self.home / SOUND).read_bytes(), (ROOT / 'mods/tinydust/harvest-complete.mp3').read_bytes())
@@ -122,6 +148,12 @@ class CompletionSoundTests(unittest.TestCase):
         for name in ['carrot', 'turnip', 'eggplant', 'broccoli']:
             asset = Path('mods/tinydust') / f'space-{name}.svg'
             self.assertEqual((self.home / asset).read_bytes(), (ROOT / asset).read_bytes())
+        for name in ['main.js', 'mod.json', 'space-status.js', 'HERDR-SPACES-LICENSE.txt']:
+            asset = Path('mods/tinydust-spaces') / name
+            self.assertEqual((self.home / asset).read_bytes(), (ROOT / asset).read_bytes())
+        new_state = self.home / 'data/tinydust-spaces/store.json'
+        self.assertEqual(json.loads(new_state.read_text()), {'machines.folded': '["sample-remote"]'})
+        self.assertEqual(native_state.read_bytes(), native_before)
         self.assertEqual(self.read()['sounds'], {'enabled': False, 'done': SOUND})
         self.store({'sounds': {'done': 'leave-this.mp3'}})
         personal = self.home / 'mods/tinydust/fonts/MyFont.ttf'
@@ -158,6 +190,8 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertTrue(any(p.read_bytes() == b'old version' for p in (self.home / 'backups').glob('tinydust-*/mods/tinydust/spaces.js')))
         self.assertEqual(list(self.home.rglob('.tinydust-install-*')), [])
         self.assertEqual(shared.read_bytes(), original_shared, 'existing font choices and other shared data must survive')
+        self.assertEqual(native_state.read_bytes(), native_before)
+        self.assertEqual(json.loads(new_state.read_text()), {'machines.folded': '["sample-remote"]'})
         self.assertEqual(self.read()['sounds']['done'], 'leave-this.mp3')
 
 

@@ -38,7 +38,7 @@ function harness(preferences=new Map()) {
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
-  for(const file of ['game.js','grove.js','labels.js','scene.js','toast.js','creation.js','workbench.js','usage-ui.js','spaces.js','pane-ui.js','main.js']){
+  for(const file of ['game.js','grove.js','labels.js','scene.js','toast.js','creation.js','workbench.js','usage-ui.js','space-status.js','spaces.js','pane-ui.js','main.js']){
     const source=readFileSync(new URL('../mods/tinydust/'+file,import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export (function|const) /g,'$1 ').replace('export default class TinyDust','class TinyDust');
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':file==='usage-ui.js'?'\nthis.UsageAPI={decodeUsage,sampleUsage,usageMoney,compactTokens};':''),context);
   }
@@ -76,9 +76,9 @@ test('New menu routes tab, space and terminal to captured targets; stale targets
 test('space shortcuts use stable icons, preserve Herdr colors and only switch valid real spaces',()=>{
   const h=harness();h.spaceList.push({id:'other',name:'Studio',active:false,tabs:[]});
   h.preferences.set('space.colors',{here:'ansi1',other:'#123456'});h.props({role:'space-shortcuts'});
-  let nodes=h.nodes();assert.equal(has(nodes,'space-shortcut-here').attrs.bg[0],'#d9649a');
-  assert.equal(has(nodes,'space-shortcut-other').attrs.bg[0],'#123456');
-  h.preferences.set('space.colors',{here:'ansi1',other:'#123456aa'});assert.equal(has(h.nodes(),'space-shortcut-other').attrs.bg[0],'#123456aa');
+  let nodes=h.nodes();assert.equal(has(nodes,'space-shortcut-here').nodes[0].attrs.bg[0],'#d9649a');
+  assert.equal(has(nodes,'space-shortcut-other').nodes[0].attrs.bg[0],'#123456');
+  h.preferences.set('space.colors',{here:'ansi1',other:'#123456aa'});assert.equal(has(h.nodes(),'space-shortcut-other').nodes[0].attrs.bg[0],'#123456aa');
   assert(has(nodes,'space-shortcut-here').attrs.accessibility_label[0].includes('Selected space'));
   for(const name of ['carrot','turnip','eggplant','broccoli']){
     const svg=readFileSync(new URL(`../mods/tinydust/space-${name}.svg`,import.meta.url),'utf8');
@@ -95,41 +95,44 @@ test('vegetable icons are stable per space in the shortcut row and collapsed rai
   h.data[0].space='plot-0';h.props({role:'space-shortcuts'});let nodes=h.nodes();
   const icon=(all,id)=>flat(has(all,id)).find(n=>n.attrs?.image)?.attrs.image[0];
   const assigned=new Map(h.spaceList.map(s=>[s.id,icon(nodes,`space-shortcut-${s.id}`)]));
-  assert.equal(new Set(assigned.values()).size,4);assert(has(nodes,'space-working-shortcut-plot-0'));
-  h.spaceList.reverse();h.props({role:'compact-spaces'});nodes=h.nodes();assert(has(nodes,'space-working-rail-plot-0'));
+  assert.equal(new Set(assigned.values()).size,4);assert(has(nodes,'space-sign-icon-plot-0-working'));
+  h.spaceList.reverse();h.props({role:'compact-spaces'});nodes=h.nodes();assert(has(nodes,'space-sign-icon-plot-0-working'));
   for(const [id,path] of assigned)assert.equal(icon(nodes,`space-rail-${id}`),path);
 });
 
-test('working-agent dots follow individual agents, respect motion and preserve other status markers',()=>{
+test('space symbols follow individual agent states without relying on color or motion',()=>{
   const h=harness();h.spaceList[0].status='blocked';h.spaceList.push({id:'other',name:'Studio',status:'done',tabs:[]},{id:'empty',name:'Empty',status:null,tabs:[]});
   h.props({role:'space-shortcuts'});let nodes=h.nodes();
-  assert(has(nodes,'space-working-shortcut-here'));assert(has(nodes,'space-working-shortcut-other'));assert(!has(nodes,'space-working-shortcut-empty'));
-  assert(has(nodes,'space-shortcut-here').attrs.accessibility_label[0].includes('blocked · agent working'));
-  assert(!has(nodes,'space-working-shortcut-here').attrs.loop,'the dot is static when motion is off');
+  for(const status of ['working','done','blocked'])assert(has(nodes,`space-sign-icon-here-${status}`),status);
+  assert(!has(nodes,'space-sign-icon-empty-working'));const label=has(nodes,'space-shortcut-here').attrs.accessibility_label[0];
+  for(const text of ['Needs attention','Finished, not yet seen','Working'])assert(label.includes(text));
+  assert(flat(has(nodes,'space-shortcut-here')).includes('!'));assert(flat(has(nodes,'space-shortcut-here')).includes('✓'));assert(flat(has(nodes,'space-shortcut-here')).includes('●'));
+  assert(!has(nodes,'space-sign-icon-here-working').attrs.loop,'symbols are static when motion is off');
   const preferences=JSON.stringify([...h.preferences]);
-  h.preferences.set('tinydust.motion',true);nodes=h.nodes();const dot=has(nodes,'space-working-shortcut-here');
-  assert.equal(dot.attrs.loop[0],'opacity');assert.equal(dot.attrs.loop[1].period,1800);
-  h.preferences.set('tinydust.quiet',true);nodes=h.nodes();assert(has(nodes,'space-working-shortcut-here'));assert(!has(nodes,'space-working-shortcut-here').attrs.loop);
+  h.preferences.set('tinydust.motion',true);nodes=h.nodes();assert.equal(has(nodes,'space-sign-icon-here-working').attrs.loop[0],'opacity');
+  assert(!has(nodes,'space-sign-icon-here-done').attrs.loop);assert(!has(nodes,'space-sign-icon-here-blocked').attrs.loop);
+  h.preferences.set('tinydust.quiet',true);nodes=h.nodes();assert(has(nodes,'space-sign-icon-here-working'));assert(!has(nodes,'space-sign-icon-here-working').attrs.loop);
   h.preferences.set('tinydust.quiet',false);h.props({role:'compact-spaces'});nodes=h.nodes();
-  const mixed=has(nodes,'space-rail-here');assert(has(nodes,'space-working-rail-here'));assert(flat(mixed).some(n=>n.attrs?.bg?.[0]==='#aabbcc'&&n.attrs?.bottom),'blocked status remains visible with a working dot');
-  h.data[0].status='idle';nodes=h.nodes();assert(!has(nodes,'space-working-rail-here'));assert(has(nodes,'space-working-rail-other'));
-  h.data.find(a=>a.address==='elsewhere').status='done';nodes=h.nodes();assert(!has(nodes,'space-working-rail-other'));
-  h.data.push({address:'remote',space:'machine/here',status:'working'});nodes=h.nodes();assert(!has(nodes,'space-working-rail-here'));
-  h.spaceList.push({id:'machine/here',name:'Remote',machine:'machine',status:'blocked',tabs:[]});nodes=h.nodes();assert(has(nodes,'space-working-rail-machine/here'));
-  h.data.pop();nodes=h.nodes();assert(!has(nodes,'space-working-rail-machine/here'));
-  h.spaceList.push({id:'stale',name:'No agent',status:'working',tabs:[]});nodes=h.nodes();
-  assert(!has(nodes,'space-working-rail-stale'));assert(!flat(has(nodes,'space-rail-stale')).some(n=>n.attrs?.bottom),'a stale aggregate status is not a working-agent dot');
+  for(const status of ['working','done','blocked'])assert(has(nodes,`space-sign-icon-here-${status}`));
+  h.data[0].status='idle';nodes=h.nodes();assert(!has(nodes,'space-sign-icon-here-working'));assert(has(nodes,'space-sign-icon-here-done'));assert(has(nodes,'space-sign-icon-other-working'));
+  h.data[1].status='idle';h.data[2].status='idle';nodes=h.nodes();assert(!has(nodes,'space-sign-icon-here-done'));assert(!has(nodes,'space-sign-icon-here-blocked'));
+  h.data.push({address:'remote',space:'machine/here',status:'working'});nodes=h.nodes();assert(!has(nodes,'space-sign-icon-here-working'));
+  h.spaceList.push({id:'machine/here',name:'Remote',machine:'machine',status:'blocked',tabs:[]});nodes=h.nodes();assert(has(nodes,'space-sign-icon-machine/here-working'));
+  h.data.pop();nodes=h.nodes();assert(!has(nodes,'space-sign-icon-machine/here-working'));
+  h.spaceList.push({id:'stale',name:'No agent',status:'working',tabs:[]});nodes=h.nodes();assert(!has(nodes,'space-sign-icon-stale-working'));
   h.preferences.delete('tinydust.motion');h.preferences.delete('tinydust.quiet');assert.equal(JSON.stringify([...h.preferences]),preferences,'indicators must not write preferences');
-  const count=h.calls.length;h.props({role:'space-shortcuts',demo:true});nodes=h.nodes();assert(has(nodes,'space-working-shortcut-sample-a'));assert(!has(nodes,'space-working-shortcut-sample-b'));
+  const count=h.calls.length;h.props({role:'space-shortcuts',demo:true});nodes=h.nodes();
+  assert(has(nodes,'space-sign-icon-sample-a-working'));assert(has(nodes,'space-sign-icon-sample-a-blocked'));assert(has(nodes,'space-sign-icon-sample-c-done'));assert(!has(nodes,'space-sign-icon-sample-b-working'));
   assert.equal(h.calls.length,count);
 });
 
 test('compact spaces show colored icons, target the exact space, and keep demo actions safe',()=>{
   const h=harness();h.spaceList[0].status='working';h.spaceList.push({id:'other',name:'Studio',status:'blocked',tabs:[]});
+  h.data.push({address:'other-blocked',space:'other',status:'blocked'});
   h.preferences.set('space.colors',{here:'ansi1',other:'#123456'});h.props({role:'compact-spaces'});
   let nodes=h.nodes();const here=has(nodes,'space-rail-here'),other=has(nodes,'space-rail-other');
-  assert.equal(here.attrs.bg[0],'#d9649a');assert.equal(other.attrs.bg[0],'#123456');
-  assert(here.attrs.accessibility_label[0].includes('working'));assert(other.attrs.accessibility_label[0].includes('blocked'));
+  assert.equal(here.nodes[0].attrs.bg[0],'#d9649a');assert.equal(other.nodes[0].attrs.bg[0],'#123456');
+  assert(here.attrs.accessibility_label[0].includes('Working'));assert(other.attrs.accessibility_label[0].includes('Needs attention'));
   assert(nodes.some(n=>n.attrs?.image?.[0]?.includes('mods/tinydust/space-')));
   other.attrs.on_click[0]();assert.equal(h.calls.at(-1)[0],'space.select');assert.equal(h.calls.at(-1)[1].id,'other');
   let stopped=false;other.attrs.on_mouse_down[1]({}, {stop_propagation(){stopped=true;}});
@@ -138,7 +141,7 @@ test('compact spaces show colored icons, target the exact space, and keep demo a
   h.props({role:'compact-spaces',demo:true});nodes=h.nodes();has(nodes,'space-rail-sample-a').attrs.on_click[0]();assert.equal(h.calls.length,count);
   h.props({role:'compact-spaces'});h.preferences.delete('space.colors');
   h.spaceList.splice(0,h.spaceList.length,{id:'A',name:'A'},{id:'B',name:'B'});nodes=h.nodes();
-  assert.notEqual(has(nodes,'space-rail-A').attrs.bg[0],has(nodes,'space-rail-B').attrs.bg[0],'new spaces have stable colorful fallbacks');
+  assert.notEqual(has(nodes,'space-rail-A').nodes[0].attrs.bg[0],has(nodes,'space-rail-B').nodes[0].attrs.bg[0],'new spaces have stable colorful fallbacks');
 });
 
 test('sidebar switches only its own space list on width changes',()=>{
@@ -153,7 +156,7 @@ test('sidebar switches only its own space list on width changes',()=>{
   alreadyFolded.nodes();assert.equal(alreadyFolded.calls.at(-1)[1].child,'tinydust-spaces-compact');
   const layoutFile=JSON.parse(readFileSync(new URL('../layouts/tinydust.json',import.meta.url),'utf8'));
   const visit=node=>[node,...(node.children??[]).flatMap(visit)], stack=visit(layoutFile).find(node=>node.id==='spaces');
-  assert.equal(stack.type,'stack');assert.equal(stack.children.find(node=>node.id==='tinydust-spaces-native').content.mod,'spaces');
+  assert.equal(stack.type,'stack');assert.equal(stack.children.find(node=>node.id==='tinydust-spaces-native').content.mod,'tinydust-spaces');
   assert.equal(stack.children.find(node=>node.id==='tinydust-spaces-compact').content.props.role,'compact-spaces');
 });
 

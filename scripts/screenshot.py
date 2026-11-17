@@ -38,7 +38,7 @@ try:
     shutil.copy2(root/'tests/preview/main.js',mod_path/'main.js')
     (mod_path/'workbench.js').write_text((root/'mods/tinydust/workbench.js').read_text().replace('mods/tinydust/workbench-sprout.svg','mods/tinydust-preview/workbench-sprout.svg'))
     shutil.copy2(root/'mods/tinydust/workbench-sprout.svg',mod_path/'workbench-sprout.svg')
-    for name in ['pane-ui.js','labels.js']:
+    for name in ['pane-ui.js','labels.js','space-status.js']:
         shutil.copy2(root/'mods/tinydust'/name,mod_path/name)
     layout_path.write_text(json.dumps(x,indent=2)+'\n')
     call('check',str(mod_path))

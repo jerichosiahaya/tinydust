@@ -7,6 +7,7 @@ import {creationMenu} from "./creation.js";
 import {workbench,workbenchBar} from "./workbench.js";
 import {usageView,sampleUsage} from "./usage-ui.js";
 import {spaceShortcuts,compactSpaces} from "./spaces.js";
+import {spaceStatuses,statusMarks} from "./space-status.js";
 import {paneHeader,paneMenu} from "./pane-ui.js";
 import {theme} from "herdr";
 export default class NativeCheck extends View {
@@ -15,6 +16,7 @@ export default class NativeCheck extends View {
     const trees=grove(list.map(a=>({address:a.address,name:a.program.name})));
     const target={pane:"sample-pane",terminal:"sample-terminal"},labels={version:1,labels:[{...target,name:"Plant the first seed"}]};
     const samplePane={...target,title:"Sample shell",cwd:"/sample",program:{name:"Sample",icon:"mods/workspace-chrome/monitor.svg",tint:true},status:"working"};
+    const states=spaceStatuses(["working","done","blocked"].map(status=>({space:"sample",status}))).get("sample");
     return div().flex().flex_col().children([
       div().w(280).h(196).child(creationMenu({target:{}},theme())),
       div().w(280).h(26).child(workbench(theme(),280)),
@@ -23,6 +25,7 @@ export default class NativeCheck extends View {
       div().w(560).h(640).child(usageView({data:sampleUsage(),busy:false,error:"",period:"today",demo:true},theme(),{scan:()=>{},period:()=>{},close:()=>{}})),
       div().w(220).h(36).child(spaceShortcuts(theme(),true)),
       div().w(44).h(150).child(compactSpaces(theme(),true)),
+      statusMarks("sample",states,theme(),true),statusMarks("sample",states,theme(),true,true),
       div().w(360).h(30).child(paneHeader(target,labels,theme(),true,()=>{},()=>{},samplePane)),
       div().w(220).h(180).child(paneMenu(target,true,theme(),0,()=>{})),
       farmScene(trees,list,{width:300,motion:true,shaken:"check-0",onTree:()=>{},onAgent:()=>{}}),
