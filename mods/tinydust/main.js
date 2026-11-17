@@ -16,6 +16,7 @@ const SAMPLE=[
   {address:"sample-4",space:"sample",program:{name:"Writer"},tab_name:"Taking a little breather",status:"idle"},
   {address:"sample-5",space:"sample",program:{name:"Helper"},tab_name:"Looking after seedlings",status:"working"},
 ];
+const DEFAULT_BRAND_FONT="Nads Handwriting";
 const button=(id,text,action)=>Button.new(id).accessibility_label(text).h(30).px(9).items_center().rounded(3)
   .bg(theme().raised).text_color(theme().foreground).text_size(11).on_click(action).child(text);
 
@@ -24,7 +25,7 @@ export default class TinyDust extends View {
     if(props()?.role==="create-menu"||props()?.role==="clear-grove"){this.menuHandle=cx.focus_handle();this.menuHandle.focus();this.clearError="";}
     if(props()?.role==="font-menu"){
       const current=props()?.demo?null:shared("tinydust.brandFont");
-      this.fontInput=InputState.new({value:typeof current==="string"?current:"",placeholder:"Silkscreen (default)"});
+      this.fontInput=InputState.new({value:typeof current==="string"?current:"",placeholder:`${DEFAULT_BRAND_FONT} (default)`});
       this.fontInput.on("submit",(_e,cx)=>this.saveFont(cx));
       this.fontInput.on("change",(_e,cx)=>{this.fontError="";cx.notify();});this.fontError="";
       this.menuHandle=cx.focus_handle();this.menuHandle.focus();
@@ -77,7 +78,7 @@ export default class TinyDust extends View {
       .when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
       .on_key_down((event,cx)=>{if(String(event.key).toLowerCase()==="escape"&&p.overlay){closeOverlay(p.overlay);cx.stop_propagation();}})
       .child(div().text_size(14).font_semibold().text_color(t.foreground).child("TinyDust title font"))
-      .child(div().text_size(11).text_color(t.muted).child("Enter an installed font family; leave blank for Silkscreen."))
+      .child(div().text_size(11).text_color(t.muted).child(`Enter an installed font family; leave blank for ${DEFAULT_BRAND_FONT}.`))
       .child(Input.new(this.fontInput).accessibility_label("Title font family").h(34).px(8).text_size(12).bg(t.background).text_color(t.foreground).border(1).border_color(t.input).rounded(3))
       .when(Boolean(this.fontError),e=>e.child(div().text_size(11).text_color(t.blocked).child(this.fontError)))
       .child(h_flex().gap(6).child(button("font-save","Save",(_e,cx)=>this.saveFont(cx)))
@@ -90,7 +91,7 @@ export default class TinyDust extends View {
     const measure=(size,cx)=>{if(size.width!==this.width||size.height!==this.height){this.width=size.width;this.height=size.height;cx.notify();}};
     if(p.role==="workbench")return workbench(t,this.width).on_size_change(measure);
     if(p.role==="brand"){
-      const requested=demo?null:shared("tinydust.brandFont"),font=typeof requested==="string"&&requested.trim()?requested.trim():"Silkscreen";
+      const requested=demo?null:shared("tinydust.brandFont"),font=typeof requested==="string"&&requested.trim()?requested.trim():DEFAULT_BRAND_FONT;
       return h_flex().id("tinydust-brand").size_full().items_center().px(6).gap(6).on_size_change(measure)
       .when(this.width>=80,e=>e.child(h_flex().id("brand-identity").flex_1().min_w(0).gap(5).items_center().tooltip("TinyDust")
         .child(image("mods/tinydust/logo.svg").id("brand-logo").w(24).h(24).flex_none())

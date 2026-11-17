@@ -1,5 +1,6 @@
 """Install only TinyDust's files. Existing files require explicit --update."""
 import argparse
+import json
 import os
 from pathlib import Path
 import shutil
@@ -36,7 +37,21 @@ if conflicts:
         (backup/f).parent.mkdir(parents=True,exist_ok=True)
         shutil.copy2(home/f,backup/f)
     print('Previous code saved to', backup)
-changed = [f for f in files if not (home/f).is_file() or (root/f).read_bytes() != (home/f).read_bytes()]
+def matches(f):
+    target = home/f
+    if not target.is_file():
+        return False
+    source, existing = (root/f).read_bytes(), target.read_bytes()
+    if source == existing:
+        return True
+    if f == Path('layouts/tinydust.json'):
+        try:
+            return json.loads(source) == json.loads(existing)
+        except (ValueError, UnicodeDecodeError):
+            pass
+    return False
+
+changed = [f for f in files if not matches(f)]
 staged = []
 try:
     for f in changed:

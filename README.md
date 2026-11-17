@@ -4,7 +4,7 @@
 
 ![TinyDust in Herdr: an interactive pixel farm in the sidebar, an expanded sample farm with working and resting characters in the center, and a simple Now-and-notes journal on the right.](preview.png)
 
-*Captured in Herdr with labeled sample agents, tasks, and workspace, using the bundled default font. The center demonstrates the expanded farm; normally your terminals live there and “Visit farm” opens the larger scene in a dialog. No personal fonts, notes, conversations, or project names are included.*
+*Captured in Herdr with labeled sample agents, tasks, and workspace, using the bundled default font. The center demonstrates the expanded farm; normally your terminals live there and “Visit farm” opens the larger scene in a dialog. No personal notes, conversations, or project names are included.*
 
 [See the workbench with a labeled mock terminal](preview-workbench.png).
 
@@ -18,7 +18,7 @@
 - **A gentle completion chime.** An original 1.2-second C-major melody is bundled. The installer selects it when no custom completion sound is set, preserving mute and existing custom sounds. **Herdr applies this sound globally, including other layouts.**
 - **A cozy workbench.** A tiny pixel sprout and garden-colored trim frame the terminal area; a clearer rose outline marks the focused pane. The decoration sits outside your terminal text. Herdr's original pane headers, split/zoom/close controls, fonts, and terminal colors stay intact.
 - **Colorful space shortcuts.** A compact row of flower, house, tree, and star icons provides quick space switching. Their colors follow Herdr's saved space colors; the original Spaces list remains below for its menus, reordering, machines, and worktrees. Icons are assigned automatically, not picked individually.
-- **A little cottage logo.** The original pixel cottage sits beside the full **TinyDust** wordmark. The title uses the bundled pixel font Silkscreen by default. Click **Aa** to enter another installed font family; only the TinyDust title changes, not your terminal or other interface text. On a narrow rail the cottage can stand alone; at the smallest width only the New control fits.
+- **A little cottage logo.** The original pixel cottage sits beside the full **TinyDust** wordmark. The title uses the bundled Nads Handwriting font by default. Click **Aa** to enter another installed font family; only the TinyDust title changes, not your terminal or other interface text. On a narrow rail the cottage can stand alone; at the smallest width only the New control fits.
 - **A softer palette.** Dusty rose, lilac, sage, apricot, and denim blue, grounded by warm charcoal. Colorful and a little sweet without turning everything pink.
 - **A simpler journal.** Just **Now** and **Notes** up front. Notes save locally as you type. Expand **Tasks** when you need the list; it starts folded away. The same journal follows you across spaces.
 - **Small tasks, fewer buttons.** Expand Tasks, type a step and press Enter or Add. Use **Focus** to make it your one Now task, or the circle to complete it. Completed tasks can be reopened; the last completion can be undone.
@@ -102,13 +102,13 @@ git pull --ff-only
 python3 scripts/install.py --update
 ```
 
-The installer backs up existing TinyDust files under `~/.config/herdr-app/backups/tinydust-<timestamp>/`. It skips unchanged files and stages each changed file before atomic replacement, loading dependencies before mod entry points; the update as a whole is not a transaction. Your journal and grove live in Herdr's runtime storage, not these source files. Updates don't intentionally modify them. Back up that storage separately before changing or deleting mods.
+The installer backs up existing TinyDust files under `~/.config/herdr-app/backups/tinydust-<timestamp>/`. It skips unchanged files (including equivalently formatted layout JSON) and stages each changed file before atomic replacement, loading dependencies before mod entry points; the update as a whole is not a transaction. Your journal and grove live in Herdr's runtime storage, not these source files. Updates don't intentionally modify them. Back up that storage separately before changing or deleting mods.
 
 ### Customize the title font
 
 1. Click **Aa** beside the TinyDust title (widen the sidebar if it is hidden).
 2. Enter an installed font's **family name**, such as `Geist`, and choose **Save**. This affects only the TinyDust title.
-3. Leave the field blank and save to return to **Silkscreen**. Herdr falls back if it cannot find a font.
+3. Leave the field blank and save to return to **Nads Handwriting**. The previous default, `Silkscreen`, is still bundled and can be chosen by name. Herdr falls back if it cannot find a font.
 
 Install custom fonts with your operating system or put `.ttf` / `.otf` files in your Herdr home's `fonts/` directory. Restart Herdr if a newly installed font is not picked up. The selection is stored in Herdr shared preferences and survives TinyDust updates; the installer doesn't overwrite unrelated personal font files.
 
@@ -116,7 +116,7 @@ Install custom fonts with your operating system or put `.ttf` / `.otf` files in 
 
 | Action | How |
 | --- | --- |
-| Change the TinyDust title font | Aa → enter an installed family name → Save; leave blank for Silkscreen |
+| Change the TinyDust title font | Aa → enter an installed family name → Save; leave blank for Nads Handwriting |
 | Switch spaces | Click a colorful shortcut or use Herdr's Spaces list below |
 | Create a tab | + New → New tab (a shell in the current space) |
 | Create a workspace | + New → New space |
@@ -183,7 +183,7 @@ python3 scripts/check-native.py
 | `mods/tinydust/toast.js` | Existing Herdr notifications in TinyDust style |
 | `mods/tinydust/creation.js` | Unified creation menu with captured/stale-target checks |
 | `mods/tinydust/spaces.js` | Colorful space shortcuts using Herdr's existing color assignments |
-| `mods/tinydust/fonts/` | Bundled Silkscreen display font and its separate OFL license |
+| `mods/tinydust/fonts/` | Nads Handwriting and Silkscreen, with their separate notices |
 | `mods/tinydust/workbench.js` | Decorative workbench trim; uses the original pixel sprout SVG |
 | `mods/tinydust/logo.svg` | Original pixel cottage and sparkle mark |
 | `mods/tinydust-journal/` | Notes, tasks, Quiet view, storage |
@@ -209,10 +209,10 @@ The script temporarily switches layouts and substitutes sample data for private 
 
 ### Validation
 
-Twenty-one Node test cases cover responsive logo and full-name behavior, persistent grove storage, per-space clearing and corrupt-data protection, compact-scene geometry and paging, space shortcuts and stale/demo targets, title-font settings, decorative workbench layout and preservation of native pane headers, creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; an additional fixtures check populated animated scenes, notification variants, the creation menu, workbench trim, space shortcuts, the brand, font menu, and grove confirmation. Creation routing is tested with host doubles; tests do not open real tabs or shells. Eight Python tests cover default/forced/opt-out sound selection, mute/custom-setting preservation, backups, invalid/symlinked/concurrently changed settings, failure cleanup, and installation of the sound, font, and license in an isolated sandbox. The installer tests also cover skipping unchanged files and preserving an installed file when replacement fails. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. The workbench, compact sidebar, title font, logo, and sample font menu were visually inspected using sample data on Linux, not actual terminal output; narrow rendering was exercised by native fixtures and host doubles. Full keyboard/screen-reader, split-pane interaction, full app-restart persistence, end-to-end notification delivery, constrained-window visual inspection, and cross-platform testing remain outstanding.
+Twenty-one Node test cases cover responsive logo and full-name behavior, persistent grove storage, per-space clearing and corrupt-data protection, compact-scene geometry and paging, space shortcuts and stale/demo targets, title-font settings, decorative workbench layout and preservation of native pane headers, creation-menu routing and stale/demo targets, journal storage and undo, missing/corrupt data, save failures, demo isolation, exact agent focus, live tree counts and limits, pagination, stable characters, pose assets, Quiet view/motion, tree interactions, and Herdr's info-level completion toast format. Render tests use host doubles, not a full GUI driver. Both mods pass Herdr's native check; an additional fixtures check populated animated scenes, notification variants, the creation menu, workbench trim, space shortcuts, the brand, font menu, and grove confirmation. Creation routing is tested with host doubles; tests do not open real tabs or shells. Eight Python tests cover default/forced/opt-out sound selection, mute/custom-setting preservation, backups, invalid/symlinked/concurrently changed settings, failure cleanup, and installation of the sound, font, and license in an isolated sandbox. The installer tests also cover preserving existing font preferences and equivalent layout JSON, skipping unchanged files, and preserving an installed file when replacement fails. The MP3 was decoded and measured locally (1.2 seconds, approximately −17.5 dBFS peak, no clipping); playback through the user's speakers was not auditioned. The workbench, compact sidebar, title font, logo, and sample font menu were visually inspected using sample data on Linux, not actual terminal output; narrow rendering was exercised by native fixtures and host doubles. Full keyboard/screen-reader, split-pane interaction, full app-restart persistence, end-to-end notification delivery, constrained-window visual inspection, and cross-platform testing remain outstanding.
 
 ## Credits and license
 
 Inspired by the cozy farming-sim genre and the idea of agents as little characters in [Pixel HQ](https://github.com/bnhan2710/pixel-hq). The interactive farm also takes design inspiration from [World of Codecraft](https://github.com/kevinpardo/world-of-codecraft): status-specific work/rest areas, completion markers, clickable characters, and a larger world view. TinyDust's implementation, artwork, and synthesized chime are original; no World of Codecraft code, art, fonts, integrations, or hooks are bundled. No Stardew Valley or Harvest Moon assets, names, music, or characters are bundled; this is not affiliated with either game.
 
-TinyDust's code and original art are [MIT licensed](LICENSE). The bundled [Silkscreen](https://github.com/googlefonts/silkscreen) display font, by Jason Kottke and the Silkscreen Project Authors, is separately licensed under the [SIL Open Font License 1.1](mods/tinydust/fonts/OFL-Silkscreen.txt); it is redistributed unmodified from [Google Fonts](https://github.com/google/fonts/tree/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/silkscreen). Herdr and the shipped mods that the layout references are separate projects under their own licenses; they aren't bundled here.
+TinyDust's code and original art are [MIT licensed](LICENSE). **Nads Handwriting** was provided by its owner for inclusion and redistribution with TinyDust; it is not covered by the MIT license. See its [notice](mods/tinydust/fonts/NadsHandwriting-NOTICE.txt) for the stated permission. The bundled [Silkscreen](https://github.com/googlefonts/silkscreen) display font, by Jason Kottke and the Silkscreen Project Authors, is separately licensed under the [SIL Open Font License 1.1](mods/tinydust/fonts/OFL-Silkscreen.txt); it is redistributed unmodified from [Google Fonts](https://github.com/google/fonts/tree/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/silkscreen). Herdr and the shipped mods that the layout references are separate projects under their own licenses; they aren't bundled here.

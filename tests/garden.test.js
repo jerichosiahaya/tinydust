@@ -82,7 +82,7 @@ test('space shortcuts use stable icons, preserve Herdr colors and only switch va
 
 test('title font is customizable, validated and demo-safe without touching other fonts',()=>{
   const h=harness();h.props({role:'brand'});let nodes=h.nodes();
-  assert.equal(has(nodes,'brand-title').attrs.font_family[0],'Silkscreen');
+  assert.equal(has(nodes,'brand-title').attrs.font_family[0],'Nads Handwriting');
   has(nodes,'font-open').attrs.on_click[0]();assert.equal(h.calls.at(-1)[1].props.role,'font-menu');
   h.props({role:'font-menu',overlay:'font-popup'});h.garden.init(null,h.cx);
   let stopped=false;has(h.nodes(),'font-menu').attrs.on_key_down[0]({key:'escape'},{stop_propagation(){stopped=true;}});
@@ -95,7 +95,9 @@ test('title font is customizable, validated and demo-safe without touching other
   h.props({role:'font-menu',demo:true});h.garden.init(null,h.cx);h.garden.fontInput.set_value('Other');h.garden.saveFont(h.cx);
   assert.equal(h.preferences.get('tinydust.brandFont'),'Custom Display');
   h.props({role:'font-menu'});h.garden.init(null,h.cx);h.garden.fontInput.set_value('');h.garden.saveFont(h.cx);assert.equal(h.preferences.get('tinydust.brandFont'),null);
-  h.props({role:'brand',demo:true});assert.equal(has(h.nodes(),'brand-title').attrs.font_family[0],'Silkscreen');
+  h.props({role:'brand'});assert.equal(has(h.nodes(),'brand-title').attrs.font_family[0],'Nads Handwriting');
+  h.preferences.set('tinydust.brandFont','Silkscreen');assert.equal(has(h.nodes(),'brand-title').attrs.font_family[0],'Silkscreen');
+  h.props({role:'brand',demo:true});assert.equal(has(h.nodes(),'brand-title').attrs.font_family[0],'Nads Handwriting');
 });
 
 test('brand shows the TinyDust wordmark and cottage without abbreviating it',()=>{

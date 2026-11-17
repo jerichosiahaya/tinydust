@@ -106,17 +106,22 @@ class CompletionSoundTests(unittest.TestCase):
         (self.home / 'AGENTS.md').write_text('Test sandbox')
         (self.home / SOUND).unlink()
         self.store({'sounds': {'enabled': False}})
+        shared = self.home / 'shared.json'
+        shared.write_text(json.dumps({'tinydust.brandFont': 'Custom Font', 'other': {'keep': True}}))
+        original_shared = shared.read_bytes()
         env = {**os.environ, 'HERDR_APP_HOME': str(self.home), 'PATH': str(binary) + os.pathsep + os.environ.get('PATH', '')}
         subprocess.run([sys.executable, str(ROOT / 'scripts/install.py')], env=env, check=True, capture_output=True)
         self.assertEqual((self.home / SOUND).read_bytes(), (ROOT / 'mods/tinydust/harvest-complete.mp3').read_bytes())
-        font = Path('mods/tinydust/fonts/Silkscreen-Regular.ttf')
-        license_file = Path('mods/tinydust/fonts/OFL-Silkscreen.txt')
-        self.assertEqual((self.home / font).read_bytes(), (ROOT / font).read_bytes())
-        self.assertEqual((self.home / license_file).read_bytes(), (ROOT / license_file).read_bytes())
+        for name in ['Silkscreen-Regular.ttf', 'OFL-Silkscreen.txt', 'NadsHandwriting-Regular.ttf', 'NadsHandwriting-NOTICE.txt']:
+            asset = Path('mods/tinydust/fonts') / name
+            self.assertEqual((self.home / asset).read_bytes(), (ROOT / asset).read_bytes())
         self.assertEqual(self.read()['sounds'], {'enabled': False, 'done': SOUND})
         self.store({'sounds': {'done': 'leave-this.mp3'}})
         personal = self.home / 'mods/tinydust/fonts/MyFont.ttf'
         personal.write_bytes(b'personal font')
+        layout = self.home / 'layouts/tinydust.json'
+        reformatted = json.dumps(json.loads(layout.read_text()), sort_keys=True) + '\n'
+        layout.write_text(reformatted)
         unchanged = self.home / 'mods/tinydust/main.js'
         os.utime(unchanged, ns=(1_000_000_000, 1_000_000_000))
         before_mtime = unchanged.stat().st_mtime_ns
@@ -140,10 +145,12 @@ runpy.run_path(sys.argv[0], run_name='__main__')
         self.assertEqual(list(self.home.rglob('.tinydust-install-*')), [])
         subprocess.run([sys.executable, str(script), '--update', '--keep-sound'], env=env, check=True, capture_output=True)
         self.assertEqual(personal.read_bytes(), b'personal font')
+        self.assertEqual(layout.read_text(), reformatted, 'equivalent layout formatting should not trigger a reload')
         self.assertEqual(unchanged.stat().st_mtime_ns, before_mtime, 'unchanged mods should not hot-reload')
         self.assertEqual(changed.read_bytes(), (ROOT / 'mods/tinydust/spaces.js').read_bytes())
         self.assertTrue(any(p.read_bytes() == b'old version' for p in (self.home / 'backups').glob('tinydust-*/mods/tinydust/spaces.js')))
         self.assertEqual(list(self.home.rglob('.tinydust-install-*')), [])
+        self.assertEqual(shared.read_bytes(), original_shared, 'existing font choices and other shared data must survive')
         self.assertEqual(self.read()['sounds']['done'], 'leave-this.mp3')
 
 
