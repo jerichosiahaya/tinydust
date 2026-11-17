@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {grove,scenePage,sceneSpot,characterFor,TREE_LIMIT} from '../mods/tinydust/game.js';
 import {GROVE_KEY,readGroves,rememberAgents,clearGrove} from '../mods/tinydust/grove.js';
+import {PANE_LABEL_KEY,readPaneLabels,matchingPane,paneLabel,setPaneLabel} from '../mods/tinydust/labels.js';
 
 function element() {
   const target={nodes:[],attrs:{}};
@@ -20,20 +21,21 @@ const has=(nodes,id)=>nodes.find(n=>n.attrs?.id?.[0]===id);
 function harness(preferences=new Map()) {
   let properties={},order=[],calls=[],timer=null;
   const spaceList=[{id:'here',name:'Garden',active:true,machine:'remote',tabs:[{id:'tab-here'}]}];
-  const paneList=[{pane:'pane-here',tab:'tab-here',focused:true,terminal:'a0'}];
+  const paneList=[{pane:'pane-here',tab:'tab-here',focused:true,terminal:'a0',title:'Shell',cwd:'/home/sample',program:{name:'Agent 0',agent:true},status:'working'},
+    {pane:'pane-other',tab:'tab-here',focused:false,terminal:'a1',title:'Shell',cwd:'/home/sample',program:{name:'Agent 1',agent:true},status:'blocked'}];
   const spaceView={id:'spaces',type:'stack',active:'tinydust-spaces-native',children:[{id:'tinydust-spaces-native'},{id:'tinydust-spaces-compact'}]};
   const sidebar={id:'sidebar',size:{px:300},children:[spaceView]},rootLayout={id:'root',children:[sidebar]},windowState={platform:'linux'};
-  const data=['working','blocked','done','idle','future'].map((status,i)=>({address:'a'+i,space:'here',status,program:{name:'Agent '+i},tab_name:'Work'}));
+  const data=['working','blocked','done','idle','future'].map((status,i)=>({address:'a'+i,pane:i===0?'pane-here':i===1?'pane-other':`pane-${i}`,space:'here',status,program:{name:'Agent '+i},tab_name:'Work'}));
   data.push({address:'elsewhere',space:'other',status:'working'});
-  const cx={notify(){},focus_handle:()=>({focus(){}}),timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}}};
-  const inputState={new:({value=''})=>({text:value,on(){},value(){return this.text;},set_value(value){this.text=value;}})};
-  const context={View:class{},div:element,image:path=>element().image(path),h_flex:element,v_flex:element,Button:{new:id=>element().id(id)},Input:{new:()=>element()},InputState:inputState,
-    props:()=>properties,theme:()=>new Proxy({},{get:()=> '#aabbcc'}),shared:k=>preferences.get(k),setShared:(k,v)=>preferences.set(k,v),
+  const cx={notify(){},stop_propagation(){},focus_handle:()=>({focus(){}}),timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}}};
+  const inputState={new:({value=''})=>({text:value,on(){},focus(){},value(){return this.text;},set_value(value){this.text=value;}})};
+  const context={View:class{},div:element,svg:path=>element().svg(path),image:path=>element().image(path),h_flex:element,v_flex:element,Button:{new:id=>element().id(id)},Input:{new:()=>element()},InputState:inputState,
+    props:()=>properties,theme:()=>new Proxy({},{get:()=> '#aabbcc'}),shared:k=>preferences.get(k),setShared:(k,v)=>preferences.set(k,v),home:()=>'/home/sample',checking:()=>true,
     agents:()=>data,spaces:()=>spaceList,panes:()=>paneList,layout:()=>rootLayout,window:()=>windowState,setAgentOrder:v=>order=v,run:(...args)=>calls.push(args),
     openOverlay:spec=>calls.push(['openOverlay',spec]),closeOverlay:id=>calls.push(['closeOverlay',id]),
     notify(){throw Error('Scene must not duplicate Herdr notifications');},playSound(){throw Error('Scene must not duplicate Herdr sounds');}};
   vm.createContext(context);
-  for(const file of ['game.js','grove.js','scene.js','toast.js','creation.js','workbench.js','spaces.js','main.js']){
+  for(const file of ['game.js','grove.js','labels.js','scene.js','toast.js','creation.js','workbench.js','spaces.js','pane-ui.js','main.js']){
     const source=readFileSync(new URL('../mods/tinydust/'+file,import.meta.url),'utf8').replace(/^import .*;\n/gm,'').replace(/export (function|const) /g,'$1 ').replace('export default class TinyDust','class TinyDust');
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':''),context);
   }
@@ -188,9 +190,112 @@ test('workbench decoration stays outside the terminal and preserves native pane 
   const visit=node=>[node,...(node.children??[]).flatMap(visit)], all=visit(layout);
   const shell=all.find(node=>node.id==='workbench'),main=all.find(node=>node.id==='main');
   assert(shell.children.includes(main));assert.equal(main.content.tab,'active');
-  assert.equal(main.content.pane.header.content.mod,'pane');assert.equal(main.content.pane.header.reveal,'always');
+  assert.equal(main.content.pane.header.content.mod,'tinydust');assert.equal(main.content.pane.header.content.props.role,'pane-header');
+  assert.equal(layout.terminal_menu,'tinydust');assert.equal(main.content.pane.header.reveal,'always');
   assert.equal(main.content.pane.focus.color,'accent');assert.equal(main.content.pane.focus.width,2);
   assert.equal(layout.terminal_padding[0],14);assert.equal(layout.terminal_padding[1],12);
+});
+
+test('pane labels validate, remain scoped to the exact terminal, and support clearing',()=>{
+  const empty=readPaneLabels(null),first={pane:'p1',terminal:'remote/t1'},second={pane:'p2',terminal:'remote/t2'};
+  const one=setPaneLabel(empty,first,'  Build API  '),two=setPaneLabel(one,second,'Write tests');
+  assert.equal(paneLabel(two,first),'Build API');assert.equal(paneLabel(two,{pane:'p1',terminal:'other'}),'');
+  assert.equal(paneLabel(two,second),'Write tests');assert.equal(empty.labels.length,0);
+  assert.equal(setPaneLabel(two,first,'Build API'),two);
+  const cleared=setPaneLabel(two,first,'  ');assert.equal(paneLabel(cleared,first),'');assert.equal(paneLabel(cleared,second),'Write tests');
+  assert.throws(()=>setPaneLabel(two,first,'x'.repeat(81)));assert.throws(()=>setPaneLabel(two,first,'bad\nname'));
+  assert.throws(()=>setPaneLabel(two,{pane:'p1'},'name'));
+  const list=[{pane:'p1',terminal:'remote/t1'},{pane:'p2',terminal:'remote/t2'}];
+  assert.equal(matchingPane(list,first),list[0]);assert.equal(matchingPane(list,{pane:'p1',terminal:'other'}),null);
+  for(const bad of [{version:2,labels:[]},{version:1,labels:null},{version:1,labels:[{...first,name:'x'},{...first,name:'y'}]},'broken'])assert.throws(()=>readPaneLabels(bad));
+});
+
+test('pane header shows its label while retaining exact native pane controls',()=>{
+  const h=harness(),target={pane:'pane-here',terminal:'a0'};
+  h.preferences.set(PANE_LABEL_KEY,{version:1,labels:[{...target,name:'Build API'}]});
+  h.props({role:'pane-header',...target});let nodes=h.nodes();assert(nodes.includes('Build API'));
+  const header=has(nodes,'pane-head-pane-here');header.attrs.on_click[0]();assert.equal(h.calls.at(-1)[0],'pane.focus');assert.equal(h.calls.at(-1)[1].pane,'pane-here');
+  let stopped=false;header.attrs.on_mouse_down[1]({}, {stop_propagation(){stopped=true;}});assert(stopped);
+  assert.equal(h.calls.at(-1)[1].props.target.pane,'pane-here');assert.equal(h.calls.at(-1)[1].props.target.terminal,'a0');
+  header.attrs.on_hover[0](true,h.cx);nodes=h.nodes();
+  for(const [id,command,args] of [['right','pane.split',{direction:'right'}],['down','pane.split',{direction:'down'}],['zoom','pane.zoom',{}],['close','pane.close',{}]]){
+    has(nodes,`pane-${id}-pane-here`).attrs.on_click[0]({},h.cx);const call=h.calls.at(-1);
+    assert.equal(call[0],command);assert.equal(call[1].pane,'pane-here');assert.equal(JSON.stringify({...call[1],pane:undefined}),JSON.stringify(args));
+  }
+  const before=h.calls.length;h.props({role:'pane-header',...target,demo:true});nodes=h.nodes();
+  has(nodes,'pane-head-pane-here').attrs.on_click[0]();has(nodes,'pane-close-pane-here').attrs.on_click[0]({},h.cx);
+  has(nodes,'pane-head-pane-here').attrs.on_mouse_down[1]({},h.cx);assert.equal(h.calls.length,before);
+});
+
+test('right-click menu renames the clicked target and delegates original Herdr actions',()=>{
+  const h=harness(),target={pane:'pane-other',terminal:'a1'};
+  h.props({tab:'pane',target,overlay:'context'});h.garden.init(null,h.cx);
+  let nodes=h.nodes();assert.equal(has(nodes,'pane-menu-rename').attrs.disabled[0],false);
+  has(nodes,'pane-menu-more').attrs.on_click[0]({},h.cx);
+  assert.equal(h.calls.at(-2)[0],'closeOverlay');assert.equal(h.calls.at(-1)[1].mod,'menu');
+  assert.equal(h.calls.at(-1)[1].props.target.pane,'pane-other');assert.equal(h.calls.at(-1)[1].props.target.terminal,'a1');
+  h.props({tab:'pane',target,overlay:'context2'});h.garden.init(null,h.cx);nodes=h.nodes();
+  has(nodes,'pane-menu-rename').attrs.on_click[0]({},h.cx);
+  assert.equal(h.calls.at(-1)[1].props.role,'rename-pane');assert.equal(h.calls.at(-1)[1].props.target.pane,'pane-other');
+  h.props({tab:'pane',target,overlay:'stale'});h.garden.init(null,h.cx);nodes=h.nodes();
+  h.paneList[1].terminal='different';const count=h.calls.length;
+  has(nodes,'pane-menu-rename').attrs.on_click[0]({},h.cx);assert.equal(h.calls.length,count);assert(h.garden.paneMenuError);
+  h.props({tab:'pane',target:{pane:'standalone',terminal:'a0'},overlay:'standalone'});h.garden.init(null,h.cx);nodes=h.nodes();
+  assert.equal(has(nodes,'pane-menu-rename').attrs.disabled[0],true);assert.equal(has(nodes,'pane-menu-more').attrs.disabled[0],false);
+  has(nodes,'pane-menu-more').attrs.on_click[0]({},h.cx);assert.equal(h.calls.at(-1)[1].props.target.pane,'standalone');
+});
+
+test('pane rename saves safely, detects stale targets and concurrent edits, and preserves other labels',()=>{
+  const h=harness(),target={pane:'pane-here',terminal:'a0'},other={pane:'pane-other',terminal:'a1'};
+  h.preferences.set(PANE_LABEL_KEY,{version:1,labels:[{...other,name:'Review'}]});
+  h.props({role:'rename-pane',target,overlay:'rename'});h.garden.init(null,h.cx);
+  h.garden.paneInput.set_value('  Build API  ');h.garden.savePaneLabel(h.cx);
+  let state=h.preferences.get(PANE_LABEL_KEY);assert.equal(paneLabel(state,target),'Build API');assert.equal(paneLabel(state,other),'Review');
+  h.props({role:'rename-pane',target,overlay:'rename2'});h.garden.init(null,h.cx);
+  h.preferences.set(PANE_LABEL_KEY,setPaneLabel(state,target,'Changed elsewhere'));
+  h.garden.paneInput.set_value('Would overwrite');h.garden.savePaneLabel(h.cx);
+  assert(h.garden.paneLabelError.includes('changed while editing'));assert.equal(paneLabel(h.preferences.get(PANE_LABEL_KEY),target),'Changed elsewhere');
+  h.props({role:'rename-pane',target,overlay:'rename3'});h.garden.init(null,h.cx);h.paneList[0].terminal='new-terminal';
+  h.garden.paneInput.set_value('Stale');h.garden.savePaneLabel(h.cx);assert(h.garden.paneLabelError.includes('changed or closed'));
+  assert.equal(paneLabel(h.preferences.get(PANE_LABEL_KEY),target),'Changed elsewhere');
+  h.paneList[0].terminal='a0';h.props({role:'rename-pane',target});h.garden.init(null,h.cx);
+  h.garden.paneInput.set_value('');h.garden.savePaneLabel(h.cx);state=h.preferences.get(PANE_LABEL_KEY);
+  assert.equal(paneLabel(state,target),'');assert.equal(paneLabel(state,other),'Review');
+  const corrupt={version:2,labels:[]};h.preferences.set(PANE_LABEL_KEY,corrupt);h.props({role:'rename-pane',target});h.garden.init(null,h.cx);
+  assert(h.garden.paneLabelLocked);assert(!has(h.nodes(),'pane-label-save'));h.garden.savePaneLabel(h.cx);assert.equal(h.preferences.get(PANE_LABEL_KEY),corrupt);
+  const failing=new Map(),otherView=harness(failing);failing.set=()=>{throw new Error('Storage unavailable');};
+  otherView.props({role:'rename-pane',target});otherView.garden.init(null,otherView.cx);otherView.garden.paneInput.set_value('Keep this draft');
+  otherView.garden.savePaneLabel(otherView.cx);assert.equal(otherView.garden.paneInput.value(),'Keep this draft');assert(otherView.garden.paneLabelError.includes('Storage unavailable'));
+});
+
+test('pane rename validates drafts and demo mode cannot change saved labels',()=>{
+  const h=harness(),target={pane:'pane-here',terminal:'a0'};
+  h.props({role:'rename-pane',target,overlay:'rename'});h.garden.init(null,h.cx);
+  h.garden.paneInput.set_value('x'.repeat(81));h.garden.savePaneLabel(h.cx);
+  assert(h.garden.paneLabelError.includes('80'));assert.equal(h.garden.paneInput.value().length,81);assert(!h.preferences.has(PANE_LABEL_KEY));
+  h.garden.paneInput.set_value('bad\nname');h.garden.savePaneLabel(h.cx);assert(h.garden.paneLabelError.includes('single-line'));assert(!h.preferences.has(PANE_LABEL_KEY));
+  h.props({role:'rename-pane',target,demo:true,overlay:'sample'});h.garden.init(null,h.cx);
+  h.garden.paneInput.set_value('Demo only');h.garden.savePaneLabel(h.cx);assert(!h.preferences.has(PANE_LABEL_KEY));
+});
+
+test('pane context menu supports keyboard navigation without sending commands to terminals',()=>{
+  const h=harness(),target={pane:'pane-here',terminal:'a0'};h.props({tab:'pane',target,overlay:'context'});h.garden.init(null,h.cx);
+  let stopped=0;const cx={notify(){},stop_propagation(){stopped++;}};
+  has(h.nodes(),'pane-menu').attrs.on_key_down[0]({key:'down'},cx);assert.equal(h.garden.paneMenuIndex,1);
+  has(h.nodes(),'pane-menu').attrs.on_key_down[0]({key:'enter'},cx);assert.equal(h.calls.at(-1)[1].mod,'menu');
+  assert.equal(h.calls.at(-1)[1].props.target.terminal,'a0');assert.equal(stopped,2);
+});
+
+test('pane labels appear on the matching character, including the compact tooltip',()=>{
+  const h=harness(),target={pane:'pane-here',terminal:'a0'};
+  h.preferences.set(PANE_LABEL_KEY,{version:1,labels:[{...target,name:'Build API'}]});
+  h.garden.height=800;let nodes=h.nodes();assert(nodes.includes('Build API'));
+  assert(has(nodes,'farmer-a0').attrs.tooltip[0].includes('Build API'));assert.equal(has(nodes,'name-a0').attrs.tooltip[0],'Build API');
+  h.garden.width=44;nodes=h.nodes();assert(has(nodes,'farmer-a0').attrs.tooltip[0].includes('Build API'));
+  let stopped=false;has(nodes,'farmer-a0').attrs.on_mouse_down[1]({}, {stop_propagation(){stopped=true;}});
+  assert(stopped);assert.equal(h.calls.at(-1)[1].props.target.pane,'pane-here');assert.equal(h.calls.at(-1)[1].props.target.terminal,'a0');
+  h.data[0].address='another-terminal';nodes=h.nodes();assert(!has(nodes,'farmer-another-terminal').attrs.tooltip[0].includes('Build API'));
+  h.props({role:'world',demo:true});h.garden.width=880;nodes=h.nodes();assert(nodes.includes('Plant the first seed'));assert(!nodes.includes('Build API'));
 });
 
 test('persistent grove counts stay honest and large scenes stay bounded',()=>{

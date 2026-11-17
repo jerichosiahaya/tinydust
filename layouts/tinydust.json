@@ -3,6 +3,7 @@
   "type": "row",
   "theme": "tinydust",
   "toast": "tinydust",
+  "terminal_menu": "tinydust",
   "preview": "layouts/tinydust.svg",
   "titlebar": "none",
   "traffic_lights": [
@@ -187,7 +188,10 @@
                       },
                       "header": {
                         "content": {
-                          "mod": "pane"
+                          "mod": "tinydust",
+                          "props": {
+                            "role": "pane-header"
+                          }
                         },
                         "height": 30,
                         "position": "top",

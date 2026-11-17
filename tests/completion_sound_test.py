@@ -115,6 +115,8 @@ class CompletionSoundTests(unittest.TestCase):
         for name in ['Silkscreen-Regular.ttf', 'OFL-Silkscreen.txt', 'NadsHandwriting-Regular.ttf', 'NadsHandwriting-NOTICE.txt']:
             asset = Path('mods/tinydust/fonts') / name
             self.assertEqual((self.home / asset).read_bytes(), (ROOT / asset).read_bytes())
+        pane_license = Path('mods/tinydust/HERDR-PANE-LICENSE.txt')
+        self.assertEqual((self.home / pane_license).read_bytes(), (ROOT / pane_license).read_bytes())
         self.assertEqual(self.read()['sounds'], {'enabled': False, 'done': SOUND})
         self.store({'sounds': {'done': 'leave-this.mp3'}})
         personal = self.home / 'mods/tinydust/fonts/MyFont.ttf'

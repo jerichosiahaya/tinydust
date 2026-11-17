@@ -1,4 +1,8 @@
 {
   "place": "none",
-  "title": "TinyDust farm"
+  "title": "TinyDust farm",
+  "overlay": {
+    "width": 240,
+    "height": 160
+  }
 }

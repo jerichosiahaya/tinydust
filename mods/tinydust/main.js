@@ -1,6 +1,6 @@
 import {View,div,image} from "gpui-kit";
 import {h_flex,v_flex,Button,Input,InputState} from "gpui-base";
-import {agents,spaces,run,setAgentOrder,shared,setShared,props,theme,openOverlay,closeOverlay,layout,window} from "herdr";
+import {agents,spaces,panes,run,setAgentOrder,shared,setShared,props,theme,openOverlay,closeOverlay,layout,window,checking} from "herdr";
 import {STATES,UNKNOWN,characterFor,scenePage,grove} from "./game.js";
 import {actor,farmScene} from "./scene.js";
 import {toastView} from "./toast.js";
@@ -8,14 +8,17 @@ import {creationTarget,creationMenu} from "./creation.js";
 import {workbench} from "./workbench.js";
 import {spaceShortcuts,compactSpaces} from "./spaces.js";
 import {GROVE_KEY,readGroves,rememberAgents,clearGrove} from "./grove.js";
+import {PANE_LABEL_KEY,readPaneLabels,matchingPane,paneLabel,setPaneLabel} from "./labels.js";
+import {paneHeader,paneMenu} from "./pane-ui.js";
 
 const SAMPLE=[
-  {address:"sample-1",space:"sample",program:{name:"Builder"},tab_name:"Plant the first seed",status:"working"},
-  {address:"sample-2",space:"sample",program:{name:"Reviewer"},tab_name:"Review the garden plan",status:"blocked"},
-  {address:"sample-3",space:"sample",program:{name:"Explorer"},tab_name:"A small task, finished",status:"done"},
-  {address:"sample-4",space:"sample",program:{name:"Writer"},tab_name:"Taking a little breather",status:"idle"},
-  {address:"sample-5",space:"sample",program:{name:"Helper"},tab_name:"Looking after seedlings",status:"working"},
+  {address:"sample-1",pane:"sample-pane-1",space:"sample",program:{name:"Builder"},tab_name:"Plant the first seed",status:"working"},
+  {address:"sample-2",pane:"sample-pane-2",space:"sample",program:{name:"Reviewer"},tab_name:"Review the garden plan",status:"blocked"},
+  {address:"sample-3",pane:"sample-pane-3",space:"sample",program:{name:"Explorer"},tab_name:"A small task, finished",status:"done"},
+  {address:"sample-4",pane:"sample-pane-4",space:"sample",program:{name:"Writer"},tab_name:"Taking a little breather",status:"idle"},
+  {address:"sample-5",pane:"sample-pane-5",space:"sample",program:{name:"Helper"},tab_name:"Looking after seedlings",status:"working"},
 ];
+const SAMPLE_PANE_LABELS={version:1,labels:SAMPLE.map(a=>({pane:a.pane,terminal:a.address,name:a.tab_name}))};
 const findNode=(node,id)=>node?.id===id?node:(node?.children??[]).map(child=>findNode(child,id)).find(Boolean);
 const DEFAULT_BRAND_FONT="Nads Handwriting";
 const button=(id,text,action)=>Button.new(id).accessibility_label(text).h(30).px(9).items_center().rounded(3)
@@ -29,7 +32,22 @@ const newButton=(text,demo)=>button("create-open",text,()=>openOverlay({
 
 export default class TinyDust extends View {
   init(_p,cx) {
-    if(props()?.role==="create-menu"||props()?.role==="clear-grove"){this.menuHandle=cx.focus_handle();this.menuHandle.focus();this.clearError="";}
+    const p=props()??{};
+    if(p.role==="create-menu"||p.role==="clear-grove"||p.role==="pane-menu"||(p.tab==="pane"&&p.target)){
+      this.menuHandle=cx.focus_handle();this.menuHandle.focus();this.clearError="";
+      this.paneMenuIndex=(p.demo&&p.target?.pane&&p.target?.terminal)||matchingPane(panes(),p.target)?0:1;this.paneMenuError="";
+    }
+    if(p.role==="rename-pane"){
+      this.paneLabelError="";this.paneLabelLocked=false;
+      try {this.paneLabelInitial=paneLabel(p.demo?SAMPLE_PANE_LABELS:readPaneLabels(shared(PANE_LABEL_KEY)),p.target);}
+      catch {this.paneLabelInitial="";this.paneLabelLocked=true;this.paneLabelError="Saved pane labels could not be read. Original data was not changed.";}
+      this.paneInput=InputState.new({value:this.paneLabelInitial,placeholder:"What is this pane working on?"});
+      this.paneInput.on("submit",(_e,cx)=>this.savePaneLabel(cx));
+      this.paneInput.on("change",(_e,cx)=>{if(!this.paneLabelLocked)this.paneLabelError="";cx.notify();});
+      this.menuHandle=cx.focus_handle();
+      if(!checking()){this.paneInput.focus();this.paneFocusTask=cx.timer.after(600,()=>this.paneInput.focus());}
+    }
+    this.paneHovered=false;
     if(props()?.role==="font-menu"){
       const current=props()?.demo?null:shared("tinydust.brandFont");
       this.fontInput=InputState.new({value:typeof current==="string"?current:"",placeholder:`${DEFAULT_BRAND_FONT} (default)`});
@@ -46,6 +64,46 @@ export default class TinyDust extends View {
     if(font.length>100||/[\x00-\x1f\x7f]/.test(font)){this.fontError="Use a font family name of at most 100 characters.";cx.notify();return;}
     if(!props()?.demo)setShared("tinydust.brandFont",font||null);
     if(props()?.overlay)closeOverlay(props().overlay);
+  }
+  openPaneMenu(target) {
+    if(props()?.demo||!matchingPane(panes(),target))return;
+    openOverlay({mod:"tinydust",kind:"popup",width:240,height:160,props:{role:"pane-menu",target:{pane:target.pane,terminal:target.terminal}}});
+  }
+  choosePaneMenu(kind,cx) {
+    const p=props()??{},target=p.target??{};
+    if(p.demo)return;
+    if(kind==="rename"){
+      if(!matchingPane(panes(),target)){this.paneMenuError="This pane changed. Reopen the menu.";cx.notify();return;}
+      if(p.overlay)closeOverlay(p.overlay);
+      openOverlay({mod:"tinydust",kind:"dialog",width:380,height:230,props:{role:"rename-pane",target:{pane:target.pane,terminal:target.terminal}}});
+    } else if(kind==="more"&&typeof target.pane==="string"&&target.pane&&typeof target.terminal==="string"&&target.terminal){
+      if(p.overlay)closeOverlay(p.overlay);
+      openOverlay({mod:"menu",kind:"popup",width:220,height:260,props:{tab:"pane",target:{pane:target.pane,terminal:target.terminal}}});
+    }
+  }
+  paneMenuKey(event,cx) {
+    const p=props()??{},key=String(event.key).toLowerCase();
+    if(key==="escape"){if(p.overlay)closeOverlay(p.overlay);cx.stop_propagation();return;}
+    const available=Boolean(matchingPane(panes(),p.target)),valid=typeof p.target?.pane==="string"&&!!p.target.pane&&typeof p.target?.terminal==="string"&&!!p.target.terminal;
+    const choices=[...(available?[0]:[]),...(valid?[1]:[])];
+    if(!choices.length)return;
+    if(key==="up"||key==="down"){
+      const at=choices.indexOf(this.paneMenuIndex),step=key==="down"?1:-1;
+      this.paneMenuIndex=choices[(Math.max(at,0)+step+choices.length)%choices.length];cx.notify();cx.stop_propagation();
+    } else if(key==="enter"){this.choosePaneMenu(this.paneMenuIndex===0?"rename":"more",cx);cx.stop_propagation();}
+  }
+  savePaneLabel(cx) {
+    const p=props()??{};
+    if(p.demo){if(p.overlay)closeOverlay(p.overlay);return;}
+    if(this.paneLabelLocked)return;
+    if(!matchingPane(panes(),p.target)){this.paneLabelError="This pane changed or closed. Nothing was saved.";cx.notify();return;}
+    try {
+      const saved=readPaneLabels(shared(PANE_LABEL_KEY));
+      if(paneLabel(saved,p.target)!==this.paneLabelInitial)throw new Error("This label changed while editing. Reopen the dialog.");
+      const next=setPaneLabel(saved,p.target,this.paneInput.value());
+      if(next!==saved)setShared(PANE_LABEL_KEY,next);
+      if(p.overlay)closeOverlay(p.overlay);
+    } catch(error){this.paneLabelError=error?.message||"Could not save the pane label.";cx.notify();}
   }
   clearGrove(cx) {
     const p=props()??{};
@@ -92,6 +150,27 @@ export default class TinyDust extends View {
   render() {
     const p=props()??{},demo=p.demo===true,expanded=p.role==="world",t=theme();
     if(p.role==="create-menu")return creationMenu(p,t).when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle));
+    if(p.role==="pane-menu"||(p.tab==="pane"&&p.target)){
+      const available=Boolean((demo&&p.target?.pane&&p.target?.terminal)||matchingPane(panes(),p.target));
+      return paneMenu(p.target,available,t,this.paneMenuIndex,(kind,cx)=>this.choosePaneMenu(kind,cx))
+        .when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
+        .on_key_down((event,cx)=>this.paneMenuKey(event,cx))
+        .when(Boolean(this.paneMenuError),e=>e.child(div().px(8).text_size(11).text_color(t.blocked).child(this.paneMenuError)));
+    }
+    if(p.role==="rename-pane")return v_flex().id("rename-pane").size_full().p(16).gap(9).bg(t.popover)
+      .when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
+      .on_key_down((event,cx)=>{if(String(event.key).toLowerCase()==="escape"&&p.overlay){closeOverlay(p.overlay);cx.stop_propagation();}})
+      .child(div().text_size(14).font_semibold().text_color(t.foreground).child("Rename pane"))
+      .child(div().text_size(11).text_color(t.muted).child("Shown in TinyDust's pane header and agent list. Leave blank to use the automatic name."))
+      .when(!this.paneLabelLocked,e=>e.child(Input.new(this.paneInput).accessibility_label("Pane label").h(34).px(8).text_size(12).bg(t.background).text_color(t.foreground).border(1).border_color(t.input).rounded(3)))
+      .when(Boolean(this.paneLabelError),e=>e.child(div().text_size(11).text_color(t.blocked).child(this.paneLabelError)))
+      .child(h_flex().gap(6).when(!this.paneLabelLocked,e=>e.child(button("pane-label-save","Save",(_e,cx)=>this.savePaneLabel(cx))))
+        .child(button("pane-label-cancel","Cancel",()=>{if(p.overlay)closeOverlay(p.overlay);})))
+      .child(div().text_size(10).text_color(t.dim).child("This does not rename the terminal itself."));
+    if(p.role==="pane-header"){
+      let labels;try {labels=p.demo?SAMPLE_PANE_LABELS:readPaneLabels(shared(PANE_LABEL_KEY));}catch {labels=readPaneLabels(null);}
+      return paneHeader(p,labels,t,this.paneHovered,(hovered,cx)=>{this.paneHovered=hovered;cx.notify();},target=>this.openPaneMenu(target));
+    }
     if(p.role==="clear-grove")return v_flex().id("clear-grove-menu").size_full().p(12).gap(10).bg(t.popover)
       .when(Boolean(this.menuHandle),e=>e.track_focus(this.menuHandle))
       .on_key_down((event,cx)=>{if(String(event.key).toLowerCase()==="escape"&&p.overlay){closeOverlay(p.overlay);cx.stop_propagation();}})
@@ -143,7 +222,12 @@ export default class TinyDust extends View {
       .when(!macRail,e=>e.child(newButton(usable>=260?"+ New":"+",demo)))
       .when(usable>=220,e=>e.child(button("journal-toggle","Journal",()=>run("layout.toggle",{id:"journal"}))));
     }
-    const all=demo?SAMPLE.map(a=>({...a,focused:a.address===this.demoSelected})):agents();
+    let paneNames,paneNamesError="";
+    try {paneNames=demo?SAMPLE_PANE_LABELS:readPaneLabels(shared(PANE_LABEL_KEY));}
+    catch {paneNames=readPaneLabels(null);paneNamesError="Saved pane labels could not be read; original data was not changed.";}
+    const all=(demo?SAMPLE.map(a=>({...a,focused:a.address===this.demoSelected})):agents()).map(a=>({
+      ...a,displayName:paneLabel(paneNames,{pane:a.pane,terminal:a.address})||a.program?.name||a.app||"Agent",
+    }));
     const space=demo?{id:"sample",name:"Sunrise farm"}:spaces().find(s=>s.active);
     const list=all.filter(a=>a.space===space?.id);
     if(!demo&&!expanded)setAgentOrder([...list,...all.filter(a=>a.space!==space?.id)].map(a=>a.address));
@@ -186,6 +270,7 @@ export default class TinyDust extends View {
         .child(div().h(25).px(12).flex_none().truncate().text_size(11).text_color(gardenError?t.blocked:t.muted)
           .tooltip(gardenError||"One tree for each agent terminal seen in this space. Trees stay after agents leave; up to 24 are drawn.")
           .child(gardenError||`${trees.count} ${trees.count===1?"tree":"trees"}${trees.count>trees.visible.length?` (${trees.visible.length} shown)`:""} · ${list.filter(a=>a.status==="working").length} working`)))
+      .when(!narrow&&Boolean(paneNamesError),e=>e.child(div().px(10).py(4).text_size(10.5).text_color(t.blocked).truncate().tooltip(paneNamesError).child(paneNamesError)))
       .when(expanded,e=>e.child(v_flex().id("farm-visit-scroll").flex_1().min_h(0).items_center().overflow_y_scrollbar().child(garden())))
       .when(!expanded&&!narrow&&!quiet&&this.height>500,e=>e.child(garden()))
       .when(!narrow&&(expanded||(!quiet&&this.height>500)),e=>e.child(pager()))
@@ -193,16 +278,17 @@ export default class TinyDust extends View {
       .when(!expanded,e=>e.child(v_flex().id("farmhands").flex_1().min_h(0).overflow_y_scrollbar()
         .when(!list.length,e=>e.child(div().p(12).text_size(12).text_color(t.muted).child(narrow?"–":"Start an agent in this space. Its character will join the farm.")))
         .children(list.map(a=>{
-          const state=STATES[a.status]??UNKNOWN,name=a.program?.name||a.app||"Agent";
+          const state=STATES[a.status]??UNKNOWN,program=a.program?.name||a.app||"Agent",name=a.displayName;
           return Button.new(`farmer-${a.address}`).accessibility_label(`${name}, ${state.label}, focus agent`).mx(narrow?4:8).mb(4).h(narrow?36:42).flex_none().px(6)
             .items_center().gap(8).rounded(3).bg(a.focused?t.selected:t.surface)
             .border(1).border_color(a.focused?t.accent:t.border)
-            .tooltip(`${name} · ${characterFor(a.address)[1]} · ${state.label} · ${a.address}`)
+            .tooltip(`${name}${name!==program?` · ${program}`:""} · ${characterFor(a.address)[1]} · ${state.label} · ${a.address}`)
             .on_click((_e,cx)=>this.focus(a,cx))
+            .on_mouse_down("right",(_e,cx)=>{const target={pane:a.pane,terminal:a.address};if(!demo&&matchingPane(panes(),target)){cx.stop_propagation();this.openPaneMenu(target);}})
             .when(narrow,e=>e.px(0).justify_center().border_color(a.focused?t.accent:state.color).child(actor(a.address,a.status,false,22)))
             .when(!narrow,e=>e.child(actor(a.address,a.status,false,26)).child(v_flex().flex_1().min_w(0).gap(2)
               .child(div().text_size(12).font_semibold().truncate().child(name))
-              .child(div().text_size(10.5).text_color(state.color).truncate().child(state.label))));
+              .child(div().text_size(10.5).text_color(state.color).truncate().child(`${state.label}${name!==program?` · ${program}`:""}`))));
         }))));
   }
 }

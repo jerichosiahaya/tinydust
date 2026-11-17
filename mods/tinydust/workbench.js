@@ -1,7 +1,7 @@
 import {div,image} from "gpui-kit";
 import {h_flex} from "gpui-base";
 
-// Decorative only: native pane headers and terminal hit targets remain untouched.
+// Decorative only: pane headers and terminal hit targets remain untouched.
 export function workbench(t,width) {
   return h_flex().id("workbench-trim").size_full().min_w(0).px(4).gap(8).items_center()
     .child(image("mods/tinydust/workbench-sprout.svg").w(24).h(24).flex_none())

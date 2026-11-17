@@ -21,7 +21,7 @@ if not (home/'AGENTS.md').exists():
     raise SystemExit('Open Herdr once first. No files installed.')
 files = [Path('layouts/tinydust.json'), Path('layouts/tinydust.svg'), Path('themes/tinydust.json')]
 for mod in ['tinydust', 'tinydust-journal']:
-    files += [p.relative_to(root) for p in (root/'mods'/mod).iterdir() if p.suffix in ['.js','.json','.svg','.mp3'] and p.name != 'jsconfig.json']
+    files += [p.relative_to(root) for p in (root/'mods'/mod).iterdir() if p.suffix in ['.js','.json','.svg','.mp3','.txt'] and p.name != 'jsconfig.json']
     font_dir = root/'mods'/mod/'fonts'
     if font_dir.exists():
         files += [p.relative_to(root) for p in font_dir.iterdir() if p.is_file() and p.suffix in ['.ttf','.otf','.txt']]

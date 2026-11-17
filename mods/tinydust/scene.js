@@ -51,7 +51,7 @@ export function farmScene(land,shown,{width,motion,expanded=false,shaken=null,on
     .children(trees)
     .child(r(0,top-5,sceneWidth,9,"#c3ad88"))
     .children(shown.flatMap((a,index)=>{
-      const state=STATES[a.status]??UNKNOWN;
+      const state=STATES[a.status]??UNKNOWN,name=a.displayName||a.program?.name||"Agent";
       const spot=sceneSpot(index,a.status,sceneWidth), rowY=top+Math.floor(index/3)*rowHeight;
       const floorY=expanded?82:56, unitX=spot.x-(size-54)/2;
       const cellX=12+(index%3)*spot.cell, patchW=Math.min(100,spot.cell-8), patchX=cellX+(spot.cell-patchW)/2;
@@ -65,8 +65,8 @@ export function farmScene(land,shown,{width,motion,expanded=false,shaken=null,on
       if(a.status==="blocked")patch.push(r(patchX+patchW-12,rowY+floorY-25,4,30,"#76564a"),r(patchX+patchW-22,rowY+floorY-24,22,12,"#d9b3ad"));
       const actorTop=top+spot.y+Math.floor(index/3)*(rowHeight-110);
       const bubble=done?"Finished!":a.status==="blocked"?"Help!":idle?"z z z":null;
-      let unit=Button.new(`unit-${a.address}`).accessibility_label(`${a.program?.name||"Agent"}, ${state.label}, focus agent`)
-        .absolute().left(unitX).top(actorTop).w(size).h(size*28/24).tooltip(`${characterFor(a.address)[1]} · ${a.program?.name||"Agent"} · ${state.label}`)
+      let unit=Button.new(`unit-${a.address}`).accessibility_label(`${name}, ${state.label}, focus agent`)
+        .absolute().left(unitX).top(actorTop).w(size).h(size*28/24).tooltip(`${characterFor(a.address)[1]} · ${name} · ${state.label}`)
         .on_click((_e,cx)=>onAgent(a,cx)).child(actor(a.address,a.status,motion,size));
       if(motion)unit=unit.transition("left",{duration:650,easing:"ease-in-out"}).transition("top",{duration:650,easing:"ease-in-out"});
       const effects=[];
@@ -79,9 +79,9 @@ export function farmScene(land,shown,{width,motion,expanded=false,shaken=null,on
         ...patch,...(a.focused?[r(unitX+7*scale,actorTop+57*scale,40*scale,3,"#fff0bd")]:[]),unit,...effects,
         ...(bubble?[div().absolute().left(cellX+2).top(rowY-3).w(spot.cell-4).flex().justify_center()
           .child(div().px(5).py(2).rounded(3).bg(done?"#f2dca9":idle?"#e4d5e7":"#f0becb").text_color("#423541").text_size(10).font_semibold().child(bubble))]:[]),
-        Button.new(`name-${a.address}`).accessibility_label(`Focus ${a.program?.name||"agent"} ${a.address}`)
+        Button.new(`name-${a.address}`).accessibility_label(`Focus ${name} ${a.address}`).tooltip(name)
           .absolute().left(cellX+(spot.cell-Math.min(120,spot.cell-4))/2).top(rowY+rowHeight-19).w(Math.min(120,spot.cell-4)).h(17).bg("#35473be6").rounded(2).on_click((_e,cx)=>onAgent(a,cx))
-          .child(div().w_full().px(3).truncate().text_size(10).text_color("#f5ece0").child(a.program?.name||"Agent")),
+          .child(div().w_full().px(3).truncate().text_size(10).text_color("#f5ece0").child(name)),
       ];
     }));
 }
