@@ -62,6 +62,7 @@ export default class TinyDust extends View {
     }
     this.width=props()?.role==="world"?880:300;this.height=600;this.page=0;
     this.demoMotion=false;this.demoSelected=null;this.lastFocused=null;
+    this.dancing=false;this.danceSpace=null;
     this.shaken=null;this.treeTask=null;this.treeMessage="";this.treeAddress=null;
   }
   close() {
@@ -261,6 +262,8 @@ export default class TinyDust extends View {
     }));
     const space=demo?{id:"sample",name:"Sunrise farm"}:spaces().find(s=>s.active);
     const list=all.filter(a=>a.space===space?.id);
+    if(this.dancing&&(!expanded||quiet||!list.length||this.danceSpace!==space?.id)){this.dancing=false;this.danceSpace=null;}
+    const dancing=expanded&&this.dancing;
     if(!demo&&!expanded)setAgentOrder([...list,...all.filter(a=>a.space!==space?.id)].map(a=>a.address));
     const narrow=this.width<240, capacity=expanded?6:3;
     const focusIndex=list.findIndex(a=>a.focused);
@@ -276,12 +279,17 @@ export default class TinyDust extends View {
       this.treeTask?.cancel();this.treeTask=null;this.shaken=null;this.treeAddress=null;this.treeMessage="";
     }
     this.page=page.page;
-    const garden=()=>farmScene(trees,page.agents,{width:this.width,motion,expanded,shaken:this.shaken,
+    const garden=()=>farmScene(trees,page.agents,{width:this.width,motion,dancing,expanded,shaken:this.shaken,
       onTree:(a,cx)=>this.touchTree(a,cx,motion),onAgent:(a,cx)=>this.focus(a,cx)});
     const controls=()=>h_flex().h(34).px(8).gap(6).items_center().flex_none()
-      .child(button("motion",quiet?"Resume game":motion?"Motion on":"Motion off",(_e,cx)=>{
+      .child(button("motion",quiet?"Resume game":dancing?(motion?"Ambient on":"Ambient off"):motion?"Motion on":"Motion off",(_e,cx)=>{
+        if(motion){this.dancing=false;this.danceSpace=null;}
         if(demo){this.demoMotion=!motion;cx.notify();}else {if(quiet)setShared("tinydust.quiet",false);setShared("tinydust.motion",!motion);}
-      }))
+      }).when(dancing,e=>e.tooltip("Background farm animation is separate from dancing.")))
+      .when(expanded,e=>e.child(button("dance",dancing?"Stop dancing":"Dance!",(_e,cx)=>{
+        if(quiet||!list.length)return;
+        this.dancing=!dancing;this.danceSpace=this.dancing?space?.id:null;cx.notify();
+      }).disabled(quiet||!list.length).tooltip(quiet?"Resume game to dance":!list.length?"Start an agent to dance":"A little dance just for this visit")))
       .when(!expanded,e=>e.child(button("visit-farm","Visit farm",()=>openOverlay({mod:"tinydust",kind:"dialog",width:940,height:720,props:{role:"world",...(demo?{demo:true}:{})}}))))
       .when(expanded&&Boolean(p.overlay),e=>e.child(button("leave-farm","Back to work",()=>closeOverlay(p.overlay))))
       .child(div().flex_1())

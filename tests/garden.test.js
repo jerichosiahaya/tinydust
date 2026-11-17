@@ -460,6 +460,57 @@ test('live scene filters spaces, focuses exact agents, paginates and keeps trees
   has(nodes,'visit-farm').attrs.on_click[0]({},h.cx);assert.equal(h.calls[1][0],'openOverlay');assert.equal(h.calls[1][1].props.role,'world');
 });
 
+test('farm dance is a local opt-in with sways and hops, and stops safely',()=>{
+  const h=harness();h.props({role:'world',overlay:'farm'});h.garden.width=880;
+  h.data.push(...[5,6,7].map(i=>({address:'a'+i,space:'here',status:'idle',program:{name:'Agent '+i}})));
+  let nodes=h.nodes();assert(!nodes.some(n=>n.attrs?.loop));assert(!has(nodes,'dance-sway-a0'));
+  assert.equal(has(nodes,'dance').attrs.disabled[0],false);assert(nodes.includes('Dance!'));
+  const saved=JSON.stringify([...h.preferences]);has(nodes,'dance').attrs.on_click[0]({},h.cx);nodes=h.nodes();
+  assert(nodes.includes('Stop dancing'));assert.equal(JSON.stringify([...h.preferences]),saved,'dance must not change saved motion or grove preferences');
+  for(const id of ['a0','a1','a2','a3','a4','a5']){
+    const sway=has(nodes,`dance-sway-${id}`),unit=has(nodes,`unit-${id}`);
+    assert(sway&&unit);assert.equal(sway.attrs.loop[0],'left');assert.notEqual(sway.attrs.loop[1].from,sway.attrs.loop[1].to);
+    assert.equal(unit.attrs.loop[0],'top');assert.equal(unit.attrs.loop[1].from,10);assert.equal(unit.attrs.loop[1].to,0);
+    assert(flat(unit).some(n=>n.attrs?.image?.[0]?.endsWith('-cheer.svg')));
+  }
+  assert(nodes.includes('♪'));assert(nodes.includes('Help!'));assert(nodes.includes('Finished!'));
+  assert(!has(nodes,'bubble-a3'),'second-row dance notes must not overlap the first row of names');
+  assert(nodes.includes('Ambient off'));
+  has(nodes,'next-field').attrs.on_click[0]({},h.cx);nodes=h.nodes();assert(has(nodes,'dance-sway-a6'));assert(has(nodes,'dance-sway-a7'));
+  has(nodes,'unit-a6').attrs.on_click[0]({},h.cx);assert.equal(h.calls.at(-1)[0],'agent.focus');assert.equal(h.calls.at(-1)[1].terminal,'a6');
+  has(nodes,'dance').attrs.on_click[0]({},h.cx);nodes=h.nodes();assert(!has(nodes,'dance-sway-a6'));assert(!nodes.some(n=>n.attrs?.loop));
+  has(nodes,'dance').attrs.on_click[0]({},h.cx);h.preferences.set('tinydust.quiet',true);nodes=h.nodes();
+  assert(!has(nodes,'dance-sway-a6'));assert.equal(has(nodes,'dance').attrs.disabled[0],true);assert(!h.garden.dancing);
+  has(nodes,'motion').attrs.on_click[0]({},h.cx);nodes=h.nodes();assert(!has(nodes,'dance-sway-a6'),'leaving Quiet view must not restart the dance');
+  has(nodes,'dance').attrs.on_click[0]({},h.cx);has(h.nodes(),'motion').attrs.on_click[0]({},h.cx);
+  assert(!h.garden.dancing,'turning motion off stops the dance');
+  h.preferences.set('tinydust.motion',false);nodes=h.nodes();has(nodes,'dance').attrs.on_click[0]({},h.cx);
+  h.spaceList[0].active=false;h.spaceList.push({id:'other',active:true});nodes=h.nodes();assert(!has(nodes,'dance-sway-elsewhere'));assert(!h.garden.dancing);
+  h.data.length=0;nodes=h.nodes();assert.equal(has(nodes,'dance').attrs.disabled[0],true);
+  h.props({role:'sidebar'});assert(!has(h.nodes(),'dance'));
+});
+
+test('dancing stays within each available lane at narrow and wide sizes',()=>{
+  const h=harness();h.props({role:'world'});
+  for(const width of [260,300,480,880]){
+    h.garden.width=width;let nodes=h.nodes();if(!h.garden.dancing)has(nodes,'dance').attrs.on_click[0]({},h.cx);nodes=h.nodes();
+    const cell=(width-24)/3;
+    for(let i=0;i<5;i++){
+      const unit=has(nodes,`dance-sway-a${i}`),x=unit.attrs.left[0],size=unit.attrs.w[0],left=12+(i%3)*cell,right=left+cell;
+      const {from,to}=unit.attrs.loop[1];
+      if(x>=left+2&&x+size<=right-2){assert(Math.min(from,to)>=left+2);assert(Math.max(from,to)+size<=right-2);}
+      else assert.equal(from,to,'never worsen an already tight lane');
+    }
+  }
+});
+
+test('sample dance stays in the preview and never changes real preferences',()=>{
+  const h=harness();h.preferences.set('tinydust.quiet',true);h.props({role:'world',demo:true});h.garden.width=880;
+  let nodes=h.nodes(),saved=JSON.stringify([...h.preferences]);has(nodes,'dance').attrs.on_click[0]({},h.cx);nodes=h.nodes();
+  assert(has(nodes,'dance-sway-sample-1'));assert(has(nodes,'unit-sample-1'));assert.equal(JSON.stringify([...h.preferences]),saved);
+  has(nodes,'unit-sample-1').attrs.on_click[0]({},h.cx);assert.equal(h.garden.demoSelected,'sample-1');assert.equal(h.calls.length,0);
+});
+
 test('work/rest/cheer sprites, opt-in animation, tree taps and Quiet view',()=>{
   const h=harness(),g=h.garden;g.height=800;
   let nodes=h.nodes();

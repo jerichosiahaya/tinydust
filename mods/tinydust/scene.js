@@ -17,7 +17,7 @@ export function actor(address,status,motion,size=54) {
 }
 
 // One visible plot per character. Native motion only; no frame-polling timer.
-export function farmScene(land,shown,{width,motion,expanded=false,shaken=null,onTree,onAgent}) {
+export function farmScene(land,shown,{width,motion,dancing=false,expanded=false,shaken=null,onTree,onAgent}) {
   const sceneWidth=Math.max(240,expanded?Math.min(width,960):width);
   const artWidth=expanded?Math.min(420,sceneWidth*0.5):Math.min(260,sceneWidth), top=artWidth*0.7;
   const rows=Math.max(1,Math.ceil(shown.length/3));
@@ -64,20 +64,28 @@ export function farmScene(land,shown,{width,motion,expanded=false,shaken=null,on
       if(idle)for(let x=0;x<4;x++)patch.push(r(patchX+x*patchW/4,rowY+floorY+2,patchW/8,expanded?26:22,"#e1bec155"));
       if(a.status==="blocked")patch.push(r(patchX+patchW-12,rowY+floorY-25,4,30,"#76564a"),r(patchX+patchW-22,rowY+floorY-24,22,12,"#d9b3ad"));
       const actorTop=top+spot.y+Math.floor(index/3)*(rowHeight-110);
-      const bubble=done?"Finished!":a.status==="blocked"?"Help!":idle?"z z z":null;
+      const bubble=done?"Finished!":a.status==="blocked"?"Help!":dancing?(index<3?"♪":null):idle?"z z z":null;
       let unit=Button.new(`unit-${a.address}`).accessibility_label(`${name}, ${state.label}, focus agent`)
-        .absolute().left(unitX).top(actorTop).w(size).h(size*28/24).tooltip(`${characterFor(a.address)[1]} · ${name} · ${state.label}`)
-        .on_click((_e,cx)=>onAgent(a,cx)).child(actor(a.address,a.status,motion,size));
-      if(motion)unit=unit.transition("left",{duration:650,easing:"ease-in-out"}).transition("top",{duration:650,easing:"ease-in-out"});
+        .w(size).h(size*28/24).tooltip(`${characterFor(a.address)[1]} · ${name} · ${state.label}`)
+        .on_click((_e,cx)=>onAgent(a,cx)).child(actor(a.address,dancing?"done":a.status,dancing?false:motion,size));
+      if(dancing){
+        const sway=Math.max(0,Math.min(12,unitX-cellX-2,cellX+spot.cell-2-size-unitX));
+        unit=div().id(`dance-sway-${a.address}`).absolute().left(unitX).top(actorTop-10).w(size).h(size*28/24+10)
+          .loop("left",{from:unitX+(index%2?-sway:sway),to:unitX+(index%2?sway:-sway),period:1360,easing:"ease-in-out"})
+          .child(unit.relative().left(0).top(10).loop("top",{from:10,to:0,period:680,easing:"ease-in-out"}));
+      } else {
+        unit=unit.absolute().left(unitX).top(actorTop);
+        if(motion)unit=unit.transition("left",{duration:650,easing:"ease-in-out"}).transition("top",{duration:650,easing:"ease-in-out"});
+      }
       const effects=[];
-      if(working)for(let i=0;i<3;i++){
+      if(working&&!dancing)for(let i=0;i<3;i++){
         let drop=r(unitX+(49+i*2)*scale,actorTop+(48+i*3)*scale,2*scale,4*scale,"#d1ebed");
         if(motion)drop=drop.loop("top",{from:actorTop+(45+i*3)*scale,to:actorTop+67*scale,period:650+i*120,easing:"linear"});
         effects.push(drop);
       }
       return [
         ...patch,...(a.focused?[r(unitX+7*scale,actorTop+57*scale,40*scale,3,"#fff0bd")]:[]),unit,...effects,
-        ...(bubble?[div().absolute().left(cellX+2).top(rowY-3).w(spot.cell-4).flex().justify_center()
+        ...(bubble?[div().id(`bubble-${a.address}`).absolute().left(cellX+2).top(rowY-(dancing&&index<3?13:3)).w(spot.cell-4).flex().justify_center()
           .child(div().px(5).py(2).rounded(3).bg(done?"#f2dca9":idle?"#e4d5e7":"#f0becb").text_color("#423541").text_size(10).font_semibold().child(bubble))]:[]),
         Button.new(`name-${a.address}`).accessibility_label(`Focus ${name} ${a.address}`).tooltip(name)
           .absolute().left(cellX+(spot.cell-Math.min(120,spot.cell-4))/2).top(rowY+rowHeight-19).w(Math.min(120,spot.cell-4)).h(17).bg("#35473be6").rounded(2).on_click((_e,cx)=>onAgent(a,cx))

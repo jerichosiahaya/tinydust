@@ -27,6 +27,7 @@ export default class NativeCheck extends View {
       div().w(220).h(180).child(paneMenu(target,true,theme(),0,()=>{})),
       farmScene(trees,list,{width:300,motion:true,shaken:"check-0",onTree:()=>{},onAgent:()=>{}}),
       farmScene(trees,list,{width:880,motion:false,expanded:true,onTree:()=>{},onAgent:()=>{}}),
+      farmScene(trees,list,{width:880,motion:false,dancing:true,expanded:true,onTree:()=>{},onAgent:()=>{}}),
       div().h(80).child(toastView({overlay:"check-only",title:"Sample finished",body:"Sample workspace",level:"info",action:{name:"agent.focus",args:{terminal:"check-2"}}},theme())),
       div().h(80).child(toastView({overlay:"check-only",title:"A generic message",body:"Sample body",level:"error"},theme())),
     ]);
