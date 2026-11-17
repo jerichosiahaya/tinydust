@@ -11,6 +11,13 @@ with tempfile.TemporaryDirectory(prefix='tinydust-check-') as directory:
     for name in ['game.js','grove.js','labels.js','pane-ui.js','scene.js','toast.js','creation.js','workbench.js','spaces.js','usage-ui.js']:
         shutil.copy2(root/'mods/tinydust'/name,target/name)
     subprocess.run(['herdr-app','check',str(target)],check=True)
+    spaces=target/'spaces.js'
+    source=spaces.read_text()
+    motion='const motion=!demo&&shared("tinydust.motion")===true&&shared("tinydust.quiet")!==true;'
+    assert motion in source
+    spaces.write_text(source.replace(motion,'const motion=true;'))
+    subprocess.run(['herdr-app','check',str(target)],check=True)
+    spaces.write_text(source)
     main=(root/'mods/tinydust/main.js').read_text()
     assert 'setShared,props,theme' in main and 'const SAMPLE=[' in main
     for role in ['brand','font-menu','space-shortcuts','compact-spaces','clear-grove','pane-header','pane-menu','rename-pane','usage']:

@@ -87,6 +87,30 @@ test('space shortcuts use stable icons, preserve Herdr colors and only switch va
   assert.equal(h.preferences.get('space.colors').here,'ansi1');
 });
 
+test('working-agent dots follow individual agents, respect motion and preserve other status markers',()=>{
+  const h=harness();h.spaceList[0].status='blocked';h.spaceList.push({id:'other',name:'Studio',status:'done',tabs:[]},{id:'empty',name:'Empty',status:null,tabs:[]});
+  h.props({role:'space-shortcuts'});let nodes=h.nodes();
+  assert(has(nodes,'space-working-shortcut-here'));assert(has(nodes,'space-working-shortcut-other'));assert(!has(nodes,'space-working-shortcut-empty'));
+  assert(has(nodes,'space-shortcut-here').attrs.accessibility_label[0].includes('blocked · agent working'));
+  assert(!has(nodes,'space-working-shortcut-here').attrs.loop,'the dot is static when motion is off');
+  const preferences=JSON.stringify([...h.preferences]);
+  h.preferences.set('tinydust.motion',true);nodes=h.nodes();const dot=has(nodes,'space-working-shortcut-here');
+  assert.equal(dot.attrs.loop[0],'opacity');assert.equal(dot.attrs.loop[1].period,1800);
+  h.preferences.set('tinydust.quiet',true);nodes=h.nodes();assert(has(nodes,'space-working-shortcut-here'));assert(!has(nodes,'space-working-shortcut-here').attrs.loop);
+  h.preferences.set('tinydust.quiet',false);h.props({role:'compact-spaces'});nodes=h.nodes();
+  const mixed=has(nodes,'space-rail-here');assert(has(nodes,'space-working-rail-here'));assert(flat(mixed).some(n=>n.attrs?.bg?.[0]==='#aabbcc'&&n.attrs?.bottom),'blocked status remains visible with a working dot');
+  h.data[0].status='idle';nodes=h.nodes();assert(!has(nodes,'space-working-rail-here'));assert(has(nodes,'space-working-rail-other'));
+  h.data.find(a=>a.address==='elsewhere').status='done';nodes=h.nodes();assert(!has(nodes,'space-working-rail-other'));
+  h.data.push({address:'remote',space:'machine/here',status:'working'});nodes=h.nodes();assert(!has(nodes,'space-working-rail-here'));
+  h.spaceList.push({id:'machine/here',name:'Remote',machine:'machine',status:'blocked',tabs:[]});nodes=h.nodes();assert(has(nodes,'space-working-rail-machine/here'));
+  h.data.pop();nodes=h.nodes();assert(!has(nodes,'space-working-rail-machine/here'));
+  h.spaceList.push({id:'stale',name:'No agent',status:'working',tabs:[]});nodes=h.nodes();
+  assert(!has(nodes,'space-working-rail-stale'));assert(!flat(has(nodes,'space-rail-stale')).some(n=>n.attrs?.bottom),'a stale aggregate status is not a working-agent dot');
+  h.preferences.delete('tinydust.motion');h.preferences.delete('tinydust.quiet');assert.equal(JSON.stringify([...h.preferences]),preferences,'indicators must not write preferences');
+  const count=h.calls.length;h.props({role:'space-shortcuts',demo:true});nodes=h.nodes();assert(has(nodes,'space-working-shortcut-sample-a'));assert(!has(nodes,'space-working-shortcut-sample-b'));
+  assert.equal(h.calls.length,count);
+});
+
 test('compact spaces show colored icons, target the exact space, and keep demo actions safe',()=>{
   const h=harness();h.spaceList[0].status='working';h.spaceList.push({id:'other',name:'Studio',status:'blocked',tabs:[]});
   h.preferences.set('space.colors',{here:'ansi1',other:'#123456'});h.props({role:'compact-spaces'});
