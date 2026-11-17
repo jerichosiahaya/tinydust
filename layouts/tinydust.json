@@ -65,14 +65,31 @@
             },
             {
               "id": "spaces",
-              "type": "block",
+              "type": "stack",
+              "active": "tinydust-spaces-native",
               "size": {
                 "px": 150
               },
               "min": 90,
-              "content": {
-                "mod": "spaces"
-              }
+              "children": [
+                {
+                  "id": "tinydust-spaces-native",
+                  "type": "block",
+                  "content": {
+                    "mod": "spaces"
+                  }
+                },
+                {
+                  "id": "tinydust-spaces-compact",
+                  "type": "block",
+                  "content": {
+                    "mod": "tinydust",
+                    "props": {
+                      "role": "compact-spaces"
+                    }
+                  }
+                }
+              ]
             },
             {
               "id": "agents",

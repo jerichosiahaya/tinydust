@@ -13,7 +13,7 @@ with tempfile.TemporaryDirectory(prefix='tinydust-check-') as directory:
     subprocess.run(['herdr-app','check',str(target)],check=True)
     main=(root/'mods/tinydust/main.js').read_text()
     assert 'setShared,props,theme' in main and 'const SAMPLE=[' in main
-    for role in ['brand','font-menu','space-shortcuts','clear-grove']:
+    for role in ['brand','font-menu','space-shortcuts','compact-spaces','clear-grove']:
         # Render the real role with isolated, sample-only props; never touch live settings.
         preview=main.replace('setShared,props,theme', 'setShared,props as originalProps,theme')
         preview=preview.replace('const SAMPLE=[', f'const props=()=>({{role:"{role}",demo:true}});\nconst SAMPLE=[')

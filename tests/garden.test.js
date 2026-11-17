@@ -21,7 +21,8 @@ function harness(preferences=new Map()) {
   let properties={},order=[],calls=[],timer=null;
   const spaceList=[{id:'here',name:'Garden',active:true,machine:'remote',tabs:[{id:'tab-here'}]}];
   const paneList=[{pane:'pane-here',tab:'tab-here',focused:true,terminal:'a0'}];
-  const sidebar={id:'sidebar',size:{px:300}},rootLayout={id:'root',children:[sidebar]},windowState={platform:'linux'};
+  const spaceView={id:'spaces',type:'stack',active:'tinydust-spaces-native',children:[{id:'tinydust-spaces-native'},{id:'tinydust-spaces-compact'}]};
+  const sidebar={id:'sidebar',size:{px:300},children:[spaceView]},rootLayout={id:'root',children:[sidebar]},windowState={platform:'linux'};
   const data=['working','blocked','done','idle','future'].map((status,i)=>({address:'a'+i,space:'here',status,program:{name:'Agent '+i},tab_name:'Work'}));
   data.push({address:'elsewhere',space:'other',status:'working'});
   const cx={notify(){},focus_handle:()=>({focus(){}}),timer:{after(ms,fn){timer=fn;return {cancel(){timer=null;}};}}};
@@ -37,7 +38,7 @@ function harness(preferences=new Map()) {
     vm.runInContext(source+(file==='main.js'?'\nthis.Garden=TinyDust;':''),context);
   }
   const garden=new context.Garden();garden.init();
-  return {garden,cx,data,spaceList,paneList,sidebar,rootLayout,windowState,preferences,calls,props:p=>{properties=p;},order:()=>Array.from(order),nodes:()=>flat(garden.render()),tick:()=>timer?.(cx)};
+  return {garden,cx,data,spaceList,paneList,sidebar,spaceView,rootLayout,windowState,preferences,calls,props:p=>{properties=p;},order:()=>Array.from(order),nodes:()=>flat(garden.render()),tick:()=>timer?.(cx)};
 }
 
 test('New menu routes tab, space and terminal to captured targets; stale targets and demos are safe',()=>{
@@ -79,6 +80,39 @@ test('space shortcuts use stable icons, preserve Herdr colors and only switch va
   h.spaceList.pop();has(nodes,'space-shortcut-other').attrs.on_click[0]();assert.equal(h.calls.length,1);
   h.props({role:'space-shortcuts',demo:true});nodes=h.nodes();has(nodes,'space-shortcut-sample-a').attrs.on_click[0]();assert.equal(h.calls.length,1);
   assert.equal(h.preferences.get('space.colors').here,'ansi1');
+});
+
+test('compact spaces show colored icons, target the exact space, and keep demo actions safe',()=>{
+  const h=harness();h.spaceList[0].status='working';h.spaceList.push({id:'other',name:'Studio',status:'blocked',tabs:[]});
+  h.preferences.set('space.colors',{here:'ansi1',other:'#123456'});h.props({role:'compact-spaces'});
+  let nodes=h.nodes();const here=has(nodes,'space-rail-here'),other=has(nodes,'space-rail-other');
+  assert.equal(here.attrs.bg[0],'#d9649a');assert.equal(other.attrs.bg[0],'#123456');
+  assert(here.attrs.accessibility_label[0].includes('working'));assert(other.attrs.accessibility_label[0].includes('blocked'));
+  assert(nodes.some(n=>n.attrs?.image?.[0]?.includes('mods/tinydust/space-')));
+  other.attrs.on_click[0]();assert.equal(h.calls.at(-1)[0],'space.select');assert.equal(h.calls.at(-1)[1].id,'other');
+  let stopped=false;other.attrs.on_mouse_down[1]({}, {stop_propagation(){stopped=true;}});
+  assert(stopped);assert.equal(h.calls.at(-1)[1].props.target.id,'other');
+  h.spaceList.pop();const count=h.calls.length;other.attrs.on_click[0]();other.attrs.on_mouse_down[1]({}, {stop_propagation(){}});assert.equal(h.calls.length,count);
+  h.props({role:'compact-spaces',demo:true});nodes=h.nodes();has(nodes,'space-rail-sample-a').attrs.on_click[0]();assert.equal(h.calls.length,count);
+  h.props({role:'compact-spaces'});h.preferences.delete('space.colors');
+  h.spaceList.splice(0,h.spaceList.length,{id:'A',name:'A'},{id:'B',name:'B'});nodes=h.nodes();
+  assert.notEqual(has(nodes,'space-rail-A').attrs.bg[0],has(nodes,'space-rail-B').attrs.bg[0],'new spaces have stable colorful fallbacks');
+});
+
+test('sidebar switches only its own space list on width changes',()=>{
+  const h=harness();h.props({role:'space-shortcuts'});
+  let measure=has(h.nodes(),'space-shortcuts-bar').attrs.on_size_change[0];
+  h.sidebar.size.px=44;measure({width:44,height:36},h.cx);assert.equal(h.calls.at(-1)[0],'layout.select');
+  assert.equal(h.calls.at(-1)[1].stack,'spaces');assert.equal(h.calls.at(-1)[1].child,'tinydust-spaces-compact');
+  h.spaceView.active='tinydust-spaces-compact';const count=h.calls.length;measure=has(h.nodes(),'space-shortcuts-bar').attrs.on_size_change[0];measure({width:44,height:36},h.cx);assert.equal(h.calls.length,count);
+  h.sidebar.size.px=300;measure({width:300,height:36},h.cx);assert.equal(h.calls.at(-1)[1].child,'tinydust-spaces-native');
+  h.props({role:'space-shortcuts',demo:true});const before=h.calls.length;measure=has(h.nodes(),'space-shortcuts-bar').attrs.on_size_change[0];measure({width:44,height:36},h.cx);assert.equal(h.calls.length,before);
+  const alreadyFolded=harness();alreadyFolded.props({role:'space-shortcuts'});alreadyFolded.sidebar.size.px=44;
+  alreadyFolded.nodes();assert.equal(alreadyFolded.calls.at(-1)[1].child,'tinydust-spaces-compact');
+  const layoutFile=JSON.parse(readFileSync(new URL('../layouts/tinydust.json',import.meta.url),'utf8'));
+  const visit=node=>[node,...(node.children??[]).flatMap(visit)], stack=visit(layoutFile).find(node=>node.id==='spaces');
+  assert.equal(stack.type,'stack');assert.equal(stack.children.find(node=>node.id==='tinydust-spaces-native').content.mod,'spaces');
+  assert.equal(stack.children.find(node=>node.id==='tinydust-spaces-compact').content.props.role,'compact-spaces');
 });
 
 test('sidebar toggle preserves width, uses the native rail, and is demo-safe',()=>{
@@ -295,6 +329,8 @@ test('work/rest/cheer sprites, opt-in animation, tree taps and Quiet view',()=>{
   h.preferences.set('tinydust.quiet',true);nodes=h.nodes();assert(!has(nodes,'living-farm'));assert(!nodes.some(n=>n.attrs?.loop));
   assert(has(nodes,'farmer-a0'));has(nodes,'motion').attrs.on_click[0]({},h.cx);assert.equal(h.preferences.get('tinydust.quiet'),false);
   g.width=100;nodes=h.nodes();assert(!has(nodes,'living-farm'));assert(has(nodes,'farmer-a0'));
+  assert(nodes.some(n=>n.attrs?.image?.[0]?.endsWith('-work-0.svg')),'compact agents keep their pixel portraits');
+  assert.equal(has(nodes,'farmer-a0').attrs.border_color[0],'#bfd7b5');
 });
 
 test('character identity is stable, poses exist, and demo never focuses real agents',()=>{

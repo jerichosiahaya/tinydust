@@ -6,7 +6,7 @@ import {actor,farmScene} from "./scene.js";
 import {toastView} from "./toast.js";
 import {creationTarget,creationMenu} from "./creation.js";
 import {workbench} from "./workbench.js";
-import {spaceShortcuts} from "./spaces.js";
+import {spaceShortcuts,compactSpaces} from "./spaces.js";
 import {GROVE_KEY,readGroves,rememberAgents,clearGrove} from "./grove.js";
 
 const SAMPLE=[
@@ -57,6 +57,12 @@ export default class TinyDust extends View {
       if(p.overlay)closeOverlay(p.overlay);
     } catch {this.clearError="Could not clear the grove. Saved data was not intentionally replaced.";cx.notify();}
   }
+  syncSpaceView(width) {
+    if(props()?.demo)return;
+    const stack=findNode(layout(),"spaces"),child=width<160?"tinydust-spaces-compact":"tinydust-spaces-native";
+    if(stack?.type==="stack"&&stack.active!==child&&stack.children?.some(node=>node.id===child))
+      run("layout.select",{stack:"spaces",child});
+  }
   toggleSidebar() {
     if(props()?.demo)return;
     const sidebar=findNode(layout(),"sidebar");
@@ -106,14 +112,20 @@ export default class TinyDust extends View {
         .child(button("font-cancel","Cancel",()=>{if(p.overlay)closeOverlay(p.overlay);})))
       .child(div().text_size(10).text_color(t.dim).child("If a font is unavailable, your system uses a fallback."));
     if(p.overlay&&typeof p.title==="string")return toastView(p,t);
-    const measure=(size,cx)=>{if(size.width!==this.width||size.height!==this.height){this.width=size.width;this.height=size.height;cx.notify();}};
+    const measure=(size,cx)=>{
+      if(p.role==="space-shortcuts")this.syncSpaceView(size.width);
+      if(size.width!==this.width||size.height!==this.height){this.width=size.width;this.height=size.height;cx.notify();}
+    };
+    if(p.role==="compact-spaces")return compactSpaces(t,demo);
     if(p.role==="space-shortcuts"){
+      // Reconcile even when a live layout update leaves the sidebar width unchanged.
+      if(!demo){const sidebar=findNode(layout(),"sidebar");this.syncSpaceView(typeof sidebar?.size?.px==="number"?sidebar.size.px:this.width);}
       const collapsed=this.width<160,label=collapsed?"Expand sidebar":"Collapse sidebar";
       return h_flex().id("space-shortcuts-bar").size_full().items_center().gap(4).on_size_change(measure)
         .when(!collapsed,e=>e.pr(8).child(div().flex_1().min_w(0).h_full().child(spaceShortcuts(t,demo))))
         .when(collapsed,e=>e.justify_center())
         .when(collapsed&&macLights(),e=>e.child(newButton("+",demo)))
-        .child(Button.new("sidebar-toggle").accessibility_label(label).tooltip(label).w(28).h(28).flex_none().items_center().justify_center().rounded(4)
+        .child(Button.new("sidebar-toggle").accessibility_label(label).when(!demo,e=>e.tooltip(label)).w(28).h(28).flex_none().items_center().justify_center().rounded(4)
           .bg(t.raised).text_color(t.foreground).text_size(19).on_click(()=>this.toggleSidebar()).child(collapsed?"›":"‹"));
     }
     const quiet=!demo&&shared("tinydust.quiet")===true;
@@ -187,7 +199,7 @@ export default class TinyDust extends View {
             .border(1).border_color(a.focused?t.accent:t.border)
             .tooltip(`${name} · ${characterFor(a.address)[1]} · ${state.label} · ${a.address}`)
             .on_click((_e,cx)=>this.focus(a,cx))
-            .when(narrow,e=>e.child(div().text_color(state.color).child(state.symbol)))
+            .when(narrow,e=>e.px(0).justify_center().border_color(a.focused?t.accent:state.color).child(actor(a.address,a.status,false,22)))
             .when(!narrow,e=>e.child(actor(a.address,a.status,false,26)).child(v_flex().flex_1().min_w(0).gap(2)
               .child(div().text_size(12).font_semibold().truncate().child(name))
               .child(div().text_size(10.5).text_color(state.color).truncate().child(state.label))));
